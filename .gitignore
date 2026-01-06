@@ -1,0 +1,6 @@
+figures/
+data/
+models/
+MNIST/
+.DS_Store
+.ipynb_checkpoints
