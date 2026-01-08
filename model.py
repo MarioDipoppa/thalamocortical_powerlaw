@@ -49,6 +49,7 @@ class RGC2LGN(nn.Module):
         
         B, C, H, W = x.shape
         S = self.kernels.shape[0]
+        assert C == self.channels, f"Expected input with {self.channels} channels, got {C}"
 
         # Prepare kernels
         kernels = self.kernels.unsqueeze(1)      # (S, 1, kH, kW)
