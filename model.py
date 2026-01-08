@@ -48,37 +48,27 @@ class RGC2LGN(nn.Module):
         """
         
         B, C, H, W = x.shape
-        assert C == self.channels
-
         S = self.kernels.shape[0]
-        device = x.device
 
-        # Prepare kernels for depthwise convolution
-        kernels = self.kernels.to(device)
-        kernels = kernels.unsqueeze(1)              # (S, 1, kH, kW)
-        kernels = kernels.repeat(1, C, 1, 1)        # (S, C, kH, kW)
-        kernels = kernels.view(S * C, 1,
-                               self.kernel_size,
-                               self.kernel_size)
+        # Prepare kernels
+        kernels = self.kernels.unsqueeze(1)      # (S, 1, kH, kW)
+        kernels = kernels.repeat(C, 1, 1, 1)     # (C*S, 1, kH, kW)
 
-        # Reshape input for grouped convolution
-        x = x.view(B * C, 1, H, W)
+        # Depthwise multi-filter convolution
+        y = F.conv2d(x, kernels, padding=self.kernel_size // 2, groups=C)
 
-        # Apply Gaussian filtering
-        y = F.conv2d(x, kernels, padding=self.kernel_size // 2, groups=1)
-
-        # Reshape back
+        # y: (B, C*S, H, W)
         y = y.view(B, C, S, H, W)
 
-        # Global average pooling over space
-        y = y.mean(dim=(-2, -1))  # (B, C, S)
+        # Global average pooling
+        y = y.mean(dim=(-2, -1))   # (B, C, S)
 
-        # Flatten to 1D representation
-        y = y.flatten(start_dim=1)  # (B, C * S)
+        # Flatten
+        y = y.flatten(start_dim=1) # (B, C*S)
 
         return y
     
-    def gaussian_kernel_2d(kernel_size: int, sigma: float, device=None):
+    def gaussian_kernel_2d(self, kernel_size: int, sigma: float, device=None):
         """
         Create a normalized 2D Gaussian kernel.
         
