@@ -1,0 +1,13 @@
+# fixed hyperparameters
+epochs: 3
+patience: 5
+min_delta: 0.0001
+
+# for hyperparameter search
+LGN_neurons: [256] # 16 * 16 since digit images are 1x16x16
+V1_neurons: [32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384]
+l1_lambdas: [0.0]
+margins: [3., 4., 5.]
+learning_rates: [0.001]
+weight_decays: [0.0]
+batch_sizes: [64]
