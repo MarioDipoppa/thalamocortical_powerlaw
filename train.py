@@ -317,7 +317,7 @@ def main():
     print("parameters and arguments loaded properly...")
         
     # let's load the training data to a train/val/test torch datasets/loaders
-    np.random.seed(args.seed)
+    np.random.seed(1234)
     triplets, labels = u.load_mat(args.data, mat_key="triplets")
     indices = np.random.permutation(len(triplets))
     train_size, val_size = int(0.7 * len(triplets)), int(0.1 * len(triplets))

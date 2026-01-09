@@ -1,5 +1,5 @@
 # fixed hyperparameters
-epochs: 3
+epochs: 300
 patience: 5
 min_delta: 0.0001
 
