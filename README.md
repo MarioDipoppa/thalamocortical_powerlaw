@@ -8,7 +8,7 @@ I've split the organization of these files into those used for the project and t
 - `model.py` contains code for the RGC2LGN and LGN2V1 models, along with modified triplet loss. These files are the essential components of the system
 - `train.py` contains training loops for training the relevant networks
 - `params.yml` contains the parameters used as input to run the `train.py` script
-- `utils.py` contains a few custom functions that are used primarily during analysis
+- `utils.py` contains a few custom functions that are used in multiple places across training and analysis, so they are implemented once for consistency
 - `testing.ipynb` is a python notebook that contains small tests that I did to ensure things worked as I expected
 - `analysis.ipynb` contains the formal analysis of the produced networks
 
