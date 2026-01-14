@@ -4,7 +4,7 @@
 #$ -l h_rt=12:00:00,h_data=16G,
 #$ -j y
 #$ -o joblog/train_TCE.$JOB_ID
-#$ -M sakinkirti@ucla.edu
+#$ -M $USER@mail
 
 # -V flag inherits the current environment variables, so just activate the environment
 
