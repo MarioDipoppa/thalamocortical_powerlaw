@@ -64,6 +64,7 @@ def train(model, train_loader, val_loader, optimizer, criterion, device, data_na
         for a, p, n in train_loader:
             a, p, n = a.to(device), p.to(device), n.to(device)
             a_out, p_out, n_out = model(a), model(p), model(n)
+            # print(f"in dtypes: {a.dtype, p.dtype, n.dtype}, out dtypes: {a_out.dtype, p_out.dtype, n_out.dtype}, data shapes: {a.shape, p.shape, n.shape}")
             triplet_loss = criterion(a_out, p_out, n_out)
 
             l1_penalty = 0.0
@@ -195,7 +196,7 @@ class TripletDataset(Dataset):
         
         # get the correct triplet
         triplet = self.triplets[idx]
-        anchor = triplet[0].unsqueeze(0).flatten()  # for now we flatten (later we can use the multiscale gaussians)
+        anchor = triplet[0].unsqueeze(0).flatten()  # for now we flatten (later we can use difference of gaussians)
         positive = triplet[1].unsqueeze(0).flatten()
         negative = triplet[2].unsqueeze(0).flatten()
         
@@ -204,9 +205,11 @@ class TripletDataset(Dataset):
 def main():
     
     # parse args
+    start_time = time.time()
     parser = argparse.ArgumentParser(description="Train LGN2V1 networks to computationally model thalamocortical expansion")
     parser.add_argument("--params", help="parameters file with details for training", default="params.yml")
     parser.add_argument("--data", help=".mat file where data is stored for training")
+    parser.add_argument("--data-key", help="the key in the .mat file where the data is stored under")
     parser.add_argument("--out", help="path where output models should be stored post-training")
     parser.add_argument("--seed", help="random seed for consistency", default=1234)
     args = parser.parse_args()
@@ -225,10 +228,14 @@ def main():
     assert "weight_decays" in params, f"Key 'weight_decays' not found in {args.params.split('/')[-1]}"
     assert "batch_sizes" in params, f"Key 'batch_sizes' not found in {args.params.split('/')[-1]}"
     print("parameters and arguments loaded properly...")
+    
+    # just print for the user so we can see the arguments
+    print(f"python --params {args.params} --data {args.data} --data-key {args.data_key} --out {args.out} --seed {args.seed}")
         
     # let's load the training data to a train/val/test torch datasets/loaders
     np.random.seed(1234)
-    triplets, labels = u.load_mat(args.data, mat_key="triplets")
+    triplets, labels = u.load_mat(args.data, data_key=args.data_key, label_key="labels", v7=False)
+    triplets = torch.Tensor(triplets.numpy().transpose(2, 3, 0, 1))
     indices = np.random.permutation(len(triplets))
     train_size, val_size = int(0.7 * len(triplets)), int(0.1 * len(triplets))
     train_data = TripletDataset(triplets[indices[:train_size]])
@@ -266,6 +273,7 @@ def main():
     
     # finally, we train
     hyperparameter_search(hyper_params=hyperparams, train_data=train_data, val_data=val_data, data_name=args.data.split('/')[-1].split('.')[0], out=args.out)
+    print(f"Total gridsearch time elapsed: {(time.time() - start_time):.2f} seconds")
     
 if __name__ == "__main__":
     main()

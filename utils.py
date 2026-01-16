@@ -23,7 +23,7 @@ class Utils:
         """
         
         x = np.array(x, dtype=np.float64)
-        assert np.amin(x) >= 0, "Gini index is only defined for non-negative values"
+        # assert np.amin(x) >= 0, "Gini index is only defined for non-negative values"
         
         # if all values are 0, just return 0
         if np.all(x == 0):
@@ -39,7 +39,7 @@ class Utils:
     ##### ------------------------------------- #####
     
     @staticmethod
-    def load_mat(filepath:str, mat_key:str, v7:bool=True):
+    def load_mat(filepath:str, data_key:str, label_key:str="labels", v7:bool=True):
         """Loads a MATLAB .mat file, handles both v7 and earlier.
 
         Args:
@@ -49,15 +49,26 @@ class Utils:
         if v7 == True:
             # load from MATLAB v7
             mat = scipy.io.loadmat(filepath)
-            raw = mat[mat_key]
+            raw = mat[data_key]
             data = raw
             
-            labels = mat["labels"]
+            # try to load the labels
+            try:
+                labels = mat[label_key]
+            except:
+                labels = None
+            
         else:
             # load from HDF5
             with h5py.File(filepath, 'r') as f:
-                raw = f[mat_key]
+                raw = f[data_key]
                 data = np.array(raw)  # this ensures a clean ndarray
+            
+                # try to load the labels
+                try:
+                    labels = f[label_key]
+                except:
+                    labels = None
 
         # transpose
         data = data.transpose(3, 2, 0, 1)

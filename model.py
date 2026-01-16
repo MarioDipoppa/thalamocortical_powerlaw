@@ -101,7 +101,9 @@ class LGN2V1(nn.Module):
         self.relu = nn.ReLU()
         
     def forward(self, x:torch.Tensor):
-        return self.relu(self.fc(x))
+        x = self.fc(x)
+        x = self.relu(x)
+        return x
     
 class ModifiedTripletLoss(nn.Module):
     """
@@ -124,8 +126,10 @@ class ModifiedTripletLoss(nn.Module):
         """
         
         # compute the distance between anchor-positive and anchor-negative
-        ap_dist = (anchor - positive).pow(2).sum(1).sqrt()
-        an_dist = (anchor - negative).pow(2).sum(1).sqrt()
+        ap_dist = (anchor - positive).pow(2).sum(1) # removed sqrt bc it was running into issues
+        an_dist = (anchor - negative).pow(2).sum(1)
+        
+        # print(f"in dtypes: {anchor.dtype, positive.dtype, negative.dtype}, dist dtypes: {ap_dist.dtype, an_dist.dtype}, data shapes: {anchor.shape, positive.shape, negative.shape}")
         
         # we can add additional terms here
         # for example, we can penalize using an arbitrarily 
