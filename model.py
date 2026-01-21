@@ -4,6 +4,134 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+class thalamocorticol_expansion(nn.Module):
+    """a unified model for thalamocortical expansion
+    """
+
+    def __init__(self, input_dim:tuple[int, int], lgn_dim:tuple[int, int], v1_dim:int, device:str):
+        """initializes our tce model
+
+        Args:
+            input_dim (tuple[int, int]): the input image dimensions, expects square image
+            lgn_dim (tuple[int, int]): the lgn dimensions, should be square and smaller than input_dim
+            v1_dim (int): the v1 dimensions
+            device (str["cuda", "cpu"]): the device to run on
+        """
+        super().__init__()
+
+        # just double check the shapes
+        assert input_dim[0] == input_dim[1], "Input dimensions must be square"
+        assert lgn_dim[0] == lgn_dim[1], "LGN dimensions must be square"
+        assert lgn_dim[0] < input_dim[0], "LGN dimensions must be smaller than input dimensions"
+
+        # just store our inputs
+        self.input_dim = input_dim
+        self.lgn_dim = lgn_dim
+        self.v1_dim = v1_dim
+
+        # build our lgn DoG model
+        self.lgn = LGNLayer(input_size=input_dim[0], lgn_size=lgn_dim[0], kernel_size=4, sigma_center_range=(0.8, 1.6), sigma_surround_range=(1.6, 3.2), device=device)
+        self.v1 = nn.Linear(lgn_dim[0]*lgn_dim[1], v1_dim) #, use_bias=False, device=device) # this just becomes matrix multiplication
+
+    def forward(self, x):
+        """forward pass
+
+        Args:
+            x (torch.Tensor): image tensor
+
+        Returns:
+            torch.Tensor: the output representation
+        """
+
+        # toss the data through each step
+        x = self.lgn(x)
+        return x
+        x = x.flatten() # just flatten as input for v1 Linear layer
+        x = self.v1(x)
+        return x
+
+class LGNLayer(nn.Module):
+    def __init__(self, input_size:int=16, lgn_size:int=4, kernel_size:int=4, sigma_center_range:tuple[float, float]=(0.5, 1.0), sigma_surround_range:tuple[float, float]=(1.2, 2.0), device="cpu"):
+        super().__init__()
+
+        self.input_size = input_size
+        self.lgn_size = lgn_size
+        self.kernel_size = kernel_size
+        self.stride = input_size // lgn_size
+
+        kernels = []
+        positions = []
+
+        for i in range(lgn_size):
+            for j in range(lgn_size):
+                sigma_c = torch.empty(1).uniform_(*sigma_center_range).item()
+                sigma_s = torch.empty(1).uniform_(
+                    max(sigma_c + 0.1, sigma_surround_range[0]),
+                    sigma_surround_range[1]
+                ).item()
+                sign = 1 if torch.rand(1).item() < 0.5 else -1
+
+                kernel = self.dog_kernel(kernel_size, sigma_c, sigma_s, sign, device=device)
+
+                kernels.append(kernel)
+                positions.append((i * self.stride, j * self.stride))
+
+        # Register as buffers (fixed, non-trainable)
+        self.register_buffer("kernels", torch.stack(kernels))  # (16, 4, 4)
+        self.positions = positions  # Python list is fine
+
+    def dog_kernel(self, size:int, sigma_center:float, sigma_surround:float, sign:int=1, device:str="cpu"):
+        """
+        Create a 2D Difference-of-Gaussians (DoG) kernel.
+
+        Args:
+            size (int): the size of the kernel
+            sigma_center (float): the standard deviation of the center kernel
+            sigma_surround (float): the standard deviation of the surround kernel
+            sign (int): +1 (ON) or -1 (OFF)
+
+        Returns:
+            kernel (torch.Tensor): (size, size) tensor
+        """
+        assert sigma_center < sigma_surround
+
+        ax = torch.arange(size, device=device) - (size - 1) / 2
+        xx, yy = torch.meshgrid(ax, ax, indexing="ij")
+
+        center = torch.exp(-(xx**2 + yy**2) / (2 * sigma_center**2))
+        surround = torch.exp(-(xx**2 + yy**2) / (2 * sigma_surround**2))
+
+        kernel = sign * (center - surround)
+        kernel = kernel / (kernel.norm() + 1e-8)
+
+        return kernel
+
+    def forward(self, x):
+        """
+        Args:
+            x: (16, 16) or (1, 16, 16)
+        Returns:
+            h: (4, 4)
+        """
+        if x.dim() == 3:
+            x = x.squeeze(0)
+
+        h = torch.zeros(
+            self.lgn_size,
+            self.lgn_size,
+            device=x.device
+        )
+
+        idx = 0
+        for i in range(self.lgn_size):
+            for j in range(self.lgn_size):
+                r, c = self.positions[idx]
+                patch = x[r:r+self.kernel_size, c:c+self.kernel_size]
+                h[i, j] = torch.sum(patch * self.kernels[idx])
+                idx += 1
+
+        return h
+
 class RGC2LGN(nn.Module):
     """
     Provides a mapping from retinal ganglion cells (RGCs) to the 
