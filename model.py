@@ -30,7 +30,7 @@ class thalamocorticol_expansion(nn.Module):
         self.v1_dim = v1_dim
 
         # build our lgn DoG model
-        self.lgn = LGNLayer(input_size=input_dim[0], lgn_size=lgn_dim[0], kernel_size=4, sigma_center_range=(0.8, 1.6), sigma_surround_range=(1.6, 3.2), device=device)
+        self.lgn = LGNLayer(input_size=input_dim[0], lgn_size=lgn_dim[0], kernel_size=input_dim[0]//lgn_dim[0], sigma_center_range=(0.8, 1.6), sigma_surround_range=(1.6, 3.2), device=device)
         self.v1 = nn.Linear(lgn_dim[0]*lgn_dim[1], v1_dim) #, use_bias=False, device=device) # this just becomes matrix multiplication
 
     def forward(self, x):
