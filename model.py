@@ -30,8 +30,8 @@ class thalamocorticol_expansion(nn.Module):
         self.v1_dim = v1_dim
 
         # build our lgn DoG model
-        self.lgn = LGNLayer(input_size=input_dim[0], lgn_size=lgn_dim[0], kernel_size=input_dim[0]//lgn_dim[0], sigma_center_range=(0.8, 1.6), sigma_surround_range=(1.6, 3.2), device=device)
-        self.v1 = nn.Linear(lgn_dim[0]*lgn_dim[1], v1_dim) #, use_bias=False, device=device) # this just becomes matrix multiplication
+        self.lgn = LGNLayer(input_size=input_dim[0], lgn_size=lgn_dim[0], kernel_size=input_dim[0]//lgn_dim[0], sigma_center_range=(0.5, 1.5), sigma_surround_range=(1.6, 4.0), device=device)
+        self.v1 = nn.Linear(lgn_dim[0]*lgn_dim[1], v1_dim, bias=False, device=device) # this just becomes matrix multiplication
 
     def forward(self, x):
         """forward pass
@@ -44,11 +44,10 @@ class thalamocorticol_expansion(nn.Module):
         """
 
         # toss the data through each step
-        x = self.lgn(x)
-        return x
-        x = x.flatten() # just flatten as input for v1 Linear layer
-        x = self.v1(x)
-        return x
+        x_lgn = self.lgn(x)
+        x_lgn_flat = x_lgn.flatten() # just flatten as input for v1 Linear layer
+        x_v1 = self.v1(x_lgn_flat)
+        return (x_lgn, x_v1)
 
 class LGNLayer(nn.Module):
     def __init__(self, input_size:int=16, lgn_size:int=4, kernel_size:int=4, sigma_center_range:tuple[float, float]=(0.5, 1.0), sigma_surround_range:tuple[float, float]=(1.2, 2.0), device="cpu"):
@@ -93,7 +92,12 @@ class LGNLayer(nn.Module):
         Returns:
             kernel (torch.Tensor): (size, size) tensor
         """
-        assert sigma_center < sigma_surround
+
+        # swap the values if they are opposite
+        if sigma_center > sigma_surround:
+            s = sigma_center
+            sigma_center = sigma_surround
+            sigma_surround = s
 
         ax = torch.arange(size, device=device) - (size - 1) / 2
         xx, yy = torch.meshgrid(ax, ax, indexing="ij")
