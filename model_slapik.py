@@ -54,7 +54,7 @@ class VVS(nn.Module):
 
         # pass the original image through each layer
         x_retina = self.norm( self.retina(x) ).view(self.B, self.C, self.H, self.W)
-        x_lgn = self.norm( self.lgn(x) ).view(self.B, self.C, self.H, self.W)
+        x_lgn = [self.norm(l).view(self.B, self.C, self.H, self.W) for l in self.lgn(x)]
         x_simple = self.norm( self.simple(x) ).view(self.B, self.C * self.theta.shape[0], self.H, self.W)
         x_complex = self.norm( self.complex(x, flag="independent") ).view(self.B, self.C * self.theta.shape[0], self.H, self.W)
 
@@ -104,7 +104,7 @@ class VVS(nn.Module):
         """
 
         # this is just a convolution with DoG kernel
-        return F.conv2d(x, self.lgn_kernel, padding="same", groups=self.B)
+        return (F.conv2d(x, self.lgn_kernel, padding="same", groups=self.B), F.conv2d(x, -self.lgn_kernel, padding="same", groups=self.B))
 
     def simple(self, x):
         """simple cells can be modeled by a gabor with given theta
