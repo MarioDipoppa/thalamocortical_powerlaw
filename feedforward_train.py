@@ -14,6 +14,7 @@ from torch.utils.data import Dataset, DataLoader, Subset
 
 from utils import Utils as u
 from model import RGC2LGN, LGN2V1, ModifiedTripletLoss as MTL
+from model_feedforward import feedforward_VVS as ffVVS
 
 def train(model, train_loader, val_loader, optimizer, criterion, device, data_name,
           v1_neurons, out, epochs=10, patience=5, min_delta=1e-4, l1_lambda=0.0,
@@ -184,7 +185,7 @@ def hyperparameter_search(hyper_params:list, train_data:torch.utils.data.Dataset
     print(f"Grid completed")
 
 class TripletDataset(Dataset):
-    """started from Mario's previous code, added labels"""
+    """started from Mario's previous code"""
     
     def __init__(self, triplet_tensor):
         self.triplets = triplet_tensor  # could be a Tensor or a Subset
@@ -196,9 +197,9 @@ class TripletDataset(Dataset):
         
         # get the correct triplet
         triplet = self.triplets[idx]
-        anchor = triplet[0].unsqueeze(0).flatten()  # for now we flatten (later we can use difference of gaussians)
-        positive = triplet[1].unsqueeze(0).flatten()
-        negative = triplet[2].unsqueeze(0).flatten()
+        anchor = triplet[0].unsqueeze(0)# .flatten()  # for now we flatten (later we can use difference of gaussians)
+        positive = triplet[1].unsqueeze(0)# .flatten()
+        negative = triplet[2].unsqueeze(0)# .flatten()
         
         return anchor, positive, negative
 
@@ -208,6 +209,7 @@ def main():
     start_time = time.time()
     parser = argparse.ArgumentParser(description="Train LGN2V1 networks to computationally model thalamocortical expansion")
     parser.add_argument("--params", help="parameters file with details for training", default="params.yml")
+    parser.add_argument("--model", help="the model to use for training")
     parser.add_argument("--data", help=".mat file where data is stored for training")
     parser.add_argument("--data-key", help="the key in the .mat file where the data is stored under")
     parser.add_argument("--out", help="path where output models should be stored post-training")
