@@ -6,8 +6,6 @@
 #$ -j y
 #$ -o joblog/test_Ringach.$JOB_ID.$TASK_ID
 #$ -M $USER@mail
-
-### Parallel Job Array for 25 combinations (5x5)
 #$ -t 1-5
 
 PYTHON_EXE="/u/home/s/skirti/miniforge3/envs/tce_v2/bin/python"
