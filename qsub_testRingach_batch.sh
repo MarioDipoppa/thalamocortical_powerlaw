@@ -11,7 +11,7 @@
 PYTHON_EXE="/u/home/s/skirti/miniforge3/envs/tce_v2/bin/python"
 INPUT_DATA="/u/home/s/skirti/project-mdipoppa/thalamocortical-expansion/01_data/natural_movies/test.npy"
 OUT_DIR="results_ringach_grid"
-BATCH_SIZE=100
+BATCH_SIZE=64
 
 # Define the grid of parameters (5 values each)
 LGN_VALUES=(100)

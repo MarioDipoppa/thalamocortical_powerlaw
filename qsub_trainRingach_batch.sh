@@ -20,13 +20,13 @@ LGN_VALUES=(100)
 V1_VALUES=(200 400 600 800 1000)
 
 PYTHON_EXE="/u/home/s/skirti/miniforge3/envs/tce_v2/bin/python"
-DATA_PATH="/u/home/s/skirti/project-mdipoppa/thalamocortical-expansion/01_data/natural_movies/triplet_patches.mat"
+DATA_PATH="/u/home/s/skirti/project-mdipoppa/thalamocortical-expansion/01_data/natural_movies/IMG_3625_patches.npy"
 DATA_KEY="allPatches"
 OUT_DIR="train_results_ringach"
 BATCH_SIZE=64
-EPOCHS=100
+EPOCHS=200
 LR=0.0001
-MARGIN=0.2
+MARGIN=3.
 
 mkdir -p $OUT_DIR
 mkdir -p joblog
