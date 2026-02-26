@@ -110,12 +110,12 @@ def main():
     
     # 1. Load and Prepare Data
     print(f"Loading data from {args.data}...")
-    mat = scipy.io.loadmat(args.data)
-    triplets = mat[args.data_key]
-    if triplets.ndim == 4 and triplets.shape[1] != 3:
-         triplets = triplets.transpose(3, 2, 0, 1)
+    #mat = scipy.io.loadmat(args.data)
+    #triplets = mat[args.data_key]
+    #if triplets.ndim == 4 and triplets.shape[1] != 3:
+    #     triplets = triplets.transpose(3, 2, 0, 1)
     
-    triplets = triplets.astype(np.float32) / 255.0
+    triplets = np.load(args.data).astype(np.float32)
     triplets = (triplets - np.mean(triplets)) / (np.std(triplets) + 1e-8)
     
     n_triplets = triplets.shape[0]
