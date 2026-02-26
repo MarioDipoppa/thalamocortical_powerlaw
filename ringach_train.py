@@ -131,7 +131,9 @@ def main():
     print(f"Initializing model (RGC_grid={n_rgc_side}, V1_grid={v1_side})...")
     model = ringach_VVS(shape=shape, n_RGC=n_rgc_side, v1_dim=v1_side)
     
-    params = model.LGN_V1_conn.data
+    # Use the full BCOO object as parameters. 
+    # JAX will automatically only differentiate with respect to the continuous (data) part.
+    params = model.LGN_V1_conn
     
     # 3. Setup Optimizer
     optimizer = optax.adam(learning_rate=args.lr)

@@ -67,6 +67,7 @@ class ringach_VVS:
         # Store RGC activations as JAX array for differentiation
         self.RGC_activations = jnp.array(RGC_acts)
         self.RGC_types = jnp.array(self.RGC_locs[:, 2])
+        self.RGC_on_mask = (self.RGC_types == 1).reshape(-1, 1, 1)
         
         ##### ----- LGN layer set up ----- #####
         self.LGN_RGC_idx = np.random.choice(self.RGC_activations.shape[0], size=int(self.RGC_activations.shape[0]*1.5), replace=True)
@@ -114,9 +115,8 @@ class ringach_VVS:
         # We can multiply the whole RGC_activations by x or (1-x) depending on the type
         # RGC_activations is (N, H, W). RGC_types is (N,)
         
-        # Create a mask for x vs (1-x)
-        mask = (self.RGC_types == 1).reshape(-1, 1, 1)
-        image_mod = jnp.where(mask, x, 1.0 - x)
+        # Use pre-calculated mask
+        image_mod = jnp.where(self.RGC_on_mask, x, 1.0 - x)
         
         act = image_mod * self.RGC_activations
         # Result is (N, H, W), flatten each filter's output
@@ -131,11 +131,14 @@ class ringach_VVS:
     def v1_forward(self, lgn_act, weights=None):
         """
         lgn_act: (N_LGN,)
-        weights: Optional trainable weights for the sparse matrix (same size as self.LGN_V1_conn.data)
+        weights: Optional trainable weights for the sparse matrix.
+                 Can be a BCOO object or a raw data array.
         """
         # Sparse multiplication
         if weights is not None:
-            # Reconstruct sparse matrix with new weights
+            if isinstance(weights, sparse.BCOO):
+                return weights @ lgn_act
+            # Reconstruct sparse matrix with new weights if raw data is provided
             conn = sparse.BCOO((weights, self.LGN_V1_conn.indices), shape=self.LGN_V1_conn.shape)
             return conn @ lgn_act
         return self.LGN_V1_conn @ lgn_act
