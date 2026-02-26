@@ -6,7 +6,6 @@ from scipy.sparse import coo_matrix
 
 import jax
 import jax.numpy as jnp
-from jax.experimental import sparse
 
 class ringach_VVS:
     """
@@ -95,9 +94,11 @@ class ringach_VVS:
             cols.extend(idx)
             vals.extend(w)
 
-        # Convert connectivity to JAX BCOO sparse matrix
-        coo = coo_matrix((vals, (rows, cols)), shape=(len(self.V1_locs), len(lgn_locs_total)))
-        self.LGN_V1_conn = sparse.BCOO.from_scipy_sparse(coo)
+        # Convert connectivity to dense JAX matrix
+        # Note: If memory is an issue for your scale, we can revisit sparse.
+        dense_conn = np.zeros((len(self.V1_locs), len(lgn_locs_total)), dtype=np.float32)
+        dense_conn[rows, cols] = vals
+        self.LGN_V1_conn = jnp.array(dense_conn)
 
     def rgc_forward(self, x):
         """
@@ -131,16 +132,11 @@ class ringach_VVS:
     def v1_forward(self, lgn_act, weights=None):
         """
         lgn_act: (N_LGN,)
-        weights: Optional trainable weights for the sparse matrix.
-                 Can be a BCOO object or a raw data array.
+        weights: Optional trainable dense weights for the V1 connectivity (D_V1, D_LGN)
         """
-        # Sparse multiplication
+        # Dense multiplication
         if weights is not None:
-            if isinstance(weights, sparse.BCOO):
-                return weights @ lgn_act
-            # Reconstruct sparse matrix with new weights if raw data is provided
-            conn = sparse.BCOO((weights, self.LGN_V1_conn.indices), shape=self.LGN_V1_conn.shape)
-            return conn @ lgn_act
+            return weights @ lgn_act
         return self.LGN_V1_conn @ lgn_act
 
     def forward(self, x, weights=None):
