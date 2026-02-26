@@ -131,8 +131,7 @@ def main():
     print(f"Initializing model (RGC_grid={n_rgc_side}, V1_grid={v1_side})...")
     model = ringach_VVS(shape=shape, n_RGC=n_rgc_side, v1_dim=v1_side, eta_0=[3,8])
     
-    # Use the full BCOO object as parameters. 
-    # JAX will automatically only differentiate with respect to the continuous (data) part.
+    # Use dense weights as parameters
     params = model.LGN_V1_conn
     
     # 3. Setup Optimizer
