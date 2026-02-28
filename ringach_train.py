@@ -11,6 +11,7 @@ from jax import grad, jit, vmap
 import optax
 
 import scipy.io
+import traceback
 from tqdm import tqdm
 from ringach_model import ringach_VVS
 
@@ -31,7 +32,7 @@ def loss_fn(weights, images_a, images_p, images_n, model_apply, margin, l1_lambd
         return triplet_loss + l1_lambda * l1_penalty
     return triplet_loss
 
-def train_one_epoch(params, opt_state, train_indices, triplets, batch_size, train_step):
+def train_one_epoch(params, opt_state, train_indices, triplets, batch_size, train_step, epoch_num):
     """Performs a single epoch of training."""
     np.random.shuffle(train_indices)
     n_batches = 0
@@ -44,8 +45,18 @@ def train_one_epoch(params, opt_state, train_indices, triplets, batch_size, trai
         a, p, n = batch[:, 0], batch[:, 1], batch[:, 2]
         
         params, opt_state, loss_val = train_step(params, opt_state, a, p, n)
+        
+        # Diagnostic: Numerical check
+        if jnp.isnan(loss_val) or jnp.isinf(loss_val):
+            print(f"NAN/INF detected in Loss at Epoch {epoch_num}, Batch {n_batches}!")
+            raise ValueError(f"Numerical instability: loss is {loss_val}")
+
         epoch_loss += loss_val
         n_batches += 1
+        
+        # Diagnostic: Frequent logging
+        if n_batches % 5 == 0:
+             print(f"  [Epoch {epoch_num}] Batch {n_batches}/{len(train_indices)//batch_size} - Current Loss: {loss_val:.4f}")
         
     return params, opt_state, epoch_loss / n_batches
 
@@ -59,7 +70,7 @@ def train_model(params, opt_state, triplets, train_indices, val_indices, args, t
         t0 = time.time()
         
         # 1. Train
-        params, opt_state, train_loss = train_one_epoch(params, opt_state, train_indices, triplets, args.batch_size, train_step)
+        params, opt_state, train_loss = train_one_epoch(params, opt_state, train_indices, triplets, args.batch_size, train_step, epoch + 1)
         
         # 2. Validate
         val_loss = 0.0
@@ -87,6 +98,13 @@ def train_model(params, opt_state, triplets, train_indices, val_indices, args, t
             if wait >= args.patience:
                 print("Early stopping triggered.")
                 break
+        
+        # Periodic Checkpoint (every 5 epochs)
+        if (epoch + 1) % 5 == 0:
+            periodic_path = os.path.join(args.out, f"checkpoint_epoch_{epoch+1}.pkl")
+            with open(periodic_path, "wb") as f:
+                pickle.dump(params, f)
+            print(f"Periodic checkpoint saved to {periodic_path}")
                 
     print(f"Training finished in {time.time() - start_time:.2f}s")
     return params
@@ -116,6 +134,11 @@ def main():
     #     triplets = triplets.transpose(3, 2, 0, 1)
     
     triplets = np.load(args.data).astype(np.float32)
+    # Diagnostic: Check for NaNs/Infs in input data
+    if np.isnan(triplets).any() or np.isinf(triplets).any():
+         print("WARNING: Data contains NaNs or Infs! Cleaning...")
+         triplets = np.nan_to_num(triplets)
+    
     triplets = (triplets - np.mean(triplets)) / (np.std(triplets) + 1e-8)
     
     n_triplets = triplets.shape[0]
@@ -134,8 +157,12 @@ def main():
     # Use dense weights as parameters
     params = model.LGN_V1_conn
     
-    # 3. Setup Optimizer
-    optimizer = optax.adam(learning_rate=args.lr)
+    # 3. Setup Optimizer with Gradient Clipping
+    # Clipping prevents exploding gradients that can sometimes crash the XLA executor silently.
+    optimizer = optax.chain(
+        optax.clip_by_global_norm(1.0),
+        optax.adam(learning_rate=args.lr)
+    )
     opt_state = optimizer.init(params)
     
     # 4. Define Differentiable Steps
@@ -153,7 +180,18 @@ def main():
         return loss_fn(params, batch_a, batch_p, batch_n, model_v1_apply, args.margin, args.l1_lambda)
 
     # 5. Run Training
-    train_model(params, opt_state, triplets, train_indices, val_indices, args, train_step, val_step)
+    print("Starting training loop...")
+    try:
+        train_model(params, opt_state, triplets, train_indices, val_indices, args, train_step, val_step)
+    except Exception as e:
+        print("\n!!! TRAINING CRASHED !!!")
+        print(f"Error: {e}")
+        traceback.print_exc()
+        # Save emergency checkpoint
+        save_path = os.path.join(args.out, "emergency_checkpoint.pkl")
+        with open(save_path, "wb") as f:
+            pickle.dump(params, f)
+        print(f"Emergency checkpoint saved to {save_path}")
 
 if __name__ == "__main__":
     main()
