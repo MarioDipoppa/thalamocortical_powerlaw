@@ -26,7 +26,7 @@ def main():
     
     # Configuration
     shape = (224, 224)
-    n_rgc_side = int(np.sqrt(args.lgn // 2.5))
+    n_rgc_side = int(np.sqrt(args.lgn * 2 // 2.5))
     v1_side = int(np.sqrt(args.v1))
     print(f"Initializing model with LGN={args.lgn} (RGC_grid={n_rgc_side}) and V1_grid={v1_side}...")
     

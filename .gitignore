@@ -1,6 +1,8 @@
 figures/
 data/
 models/
+results*/
+train*/
 MNIST/
 .DS_Store
 .ipynb_checkpoints
