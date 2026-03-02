@@ -5,18 +5,34 @@ When light enters the eye, retinal ganglion cells (RGCs) are stimulated. They pa
 I've split the organization of these files into those used for the project and those files that are primarily for setup and information.
 
 ### project
-- `model.py` contains code for the RGC2LGN and LGN2V1 models, along with modified triplet loss. These files are the essential components of the system
-- `train.py` contains training loops for training the relevant networks
-- `params.yml` contains the parameters used as input to run the `train.py` script
-- `utils.py` contains a few custom functions that are used in multiple places across training and analysis, so they are implemented once for consistency
-- `testing.ipynb` is a python notebook that contains small tests that I did to ensure things worked as I expected
-- `analysis.ipynb` contains the formal analysis of the produced networks
+
+#### models
+- [`model.py`](model.py) contains the base RGC2LGN and LGN2V1 models and modified triplet loss.
+- [`ringach_model.py`](ringach_model.py) implements the Ringach VVS model using JAX for differentiable forward passes.
+- [`feedforward_model.py`](feedforward_model.py) implements a standard convolutional feedforward VVS model.
+- [`slapik_model.py`](slapik_model.py) implements the early visual system model based on Slapik & Shouval (2026).
+
+#### training & data
+- [`ringach_train.py`](ringach_train.py) JAX-based training script for the Ringach model.
+- [`feedforward_train.py`](feedforward_train.py) PyTorch-based training script for feedforward models.
+- [`generate_triplets.py`](generate_triplets.py) script to generate anchor-positive-negative triplets from video data.
+- [`ringach_test.py`](ringach_test.py) benchmarking and testing script for the Ringach model.
+- [`params.yml`](params.yml) configuration parameters for training scripts.
+- [`utils.py`](utils.py) shared custom utility functions.
+
+#### cluster submission
+- `qsub_trainRingach_batch.sh` / `qsub_testRingach_batch.sh` grid engine scripts for training/testing the Ringach model on the cluster.
+- `qsub_trainTCE_batch.sh` / `qsub_trainTCE_sequential.sh` scripts for batch training of TCE models.
+
+#### analysis & testing
+- `slapik_analysis.ipynb` formal analysis of representations in the Slapik model.
+- `testing.ipynb` interactive notebook for exploratory tests and verification.
 
 ### organization
-- `environment.yml` contains all packages required to reproduce results for this project
-- `README.md` __this__ file, contains essential information regarding the project and important documentation
-- `TODO.md` a todo list that I'm using to keep track of progress
-- `.gitignore` keeps track of files/folders to not track using git
+- `environment.yml` conda environment specification for reproducibility.
+- `README.md` __this__ file, containing project documentation.
+- `TODO.md` checklist for tracking project progress.
+- `.gitignore` git exclusion patterns.
 
 ## setup
 1. you can install `miniconda` by following the instructions [here](https://www.anaconda.com/docs/getting-started/miniconda/install#quickstart-install-instructions)

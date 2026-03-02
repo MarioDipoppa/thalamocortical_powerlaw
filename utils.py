@@ -6,6 +6,9 @@ import scipy
 import torch
 import torch.nn.functional as F
 
+import jax
+import jax.numpy as jnp
+
 class Utils:
     
     ##### ------------------------------------- #####
@@ -13,26 +16,30 @@ class Utils:
     ##### ------------------------------------- #####
     
     @staticmethod
-    def gini(x:np.ndarray):
-        """Compute the Gini index of a numpy array.
+    def gini(x):
+        """Compute the Gini index of an array (NumPy or JAX).
         
         Args:
-            x (np.ndarray): Input array of non-negative values.
+            x: Input array of non-negative values.
         Returns:
             float: the Gini index; 0 means perfect equality, 1 means maximal inequality.
         """
-        
-        x = np.array(x, dtype=np.float64)
-        # assert np.amin(x) >= 0, "Gini index is only defined for non-negative values"
-        
-        # if all values are 0, just return 0
-        if np.all(x == 0):
-            return 0.0
-
-        x_sorted = np.sort(x)
-        n = len(x)
-        index = np.arange(1, n + 1)
-        return (2 * np.sum(index * x_sorted) / np.sum(x)) / n - (n + 1) / n
+        if isinstance(x, (jnp.ndarray, jax.Array)):
+            x = x.astype(jnp.float64)
+            if jnp.all(x == 0):
+                return 0.0
+            x_sorted = jnp.sort(x)
+            n = len(x)
+            index = jnp.arange(1, n + 1)
+            return (2 * jnp.sum(index * x_sorted) / jnp.sum(x)) / n - (n + 1) / n
+        else:
+            x = np.array(x, dtype=np.float64)
+            if np.all(x == 0):
+                return 0.0
+            x_sorted = np.sort(x)
+            n = len(x)
+            index = np.arange(1, n + 1)
+            return (2 * np.sum(index * x_sorted) / np.sum(x)) / n - (n + 1) / n
     
     ##### ------------------------------------- #####
     #####             LOADING DATA              #####
@@ -180,3 +187,83 @@ class Utils:
 
         # Flatten back and copy into model
         model.fc.weight.data.copy_(smoothed.view(emb_dim, -1))
+
+    @staticmethod
+    def batch_generator(arr, batch_size, start_idx=0, end_idx=None):
+        """Yields batches from an array with optional start and end indices.
+        
+        Args:
+            arr (np.ndarray): The array to batch.
+            batch_size (int): Size of each batch.
+            start_idx (int, optional): Starting index. Defaults to 0.
+            end_idx (int, optional): Ending index. Defaults to arr.shape[0].
+        """
+        if end_idx is None:
+            end_idx = arr.shape[0]
+        for i in range(start_idx, end_idx, batch_size):
+            batch = arr[i:i+batch_size].astype(np.float32)
+            yield batch
+
+    @staticmethod
+    def jax_loss_fn(weights, images_a, images_p, images_n, model_apply, margin, l1_lambda):
+        """JAX implementation of Triplet Loss with optional L1 penalty."""
+        a_out = model_apply(images_a, weights)
+        p_out = model_apply(images_p, weights)
+        n_out = model_apply(images_n, weights)
+        
+        # Triplet Loss
+        ap_dist = jnp.sum((a_out - p_out)**2, axis=1)
+        an_dist = jnp.sum((a_out - n_out)**2, axis=1)
+        triplet_loss = jnp.mean(jax.nn.relu(ap_dist - an_dist + margin))
+        
+        # L1 Penalty
+        if l1_lambda > 0:
+            l1_penalty = (jnp.mean(jnp.abs(a_out)) + jnp.mean(jnp.abs(p_out)) + jnp.mean(jnp.abs(n_out))) / 3.0
+            return triplet_loss + l1_lambda * l1_penalty
+        return triplet_loss
+
+    @staticmethod
+    def compute_triplet_margin_stats_jax(weights, generator, model_apply, margin=0.2):
+        """Computes triplet statistics using JAX."""
+        ap_dists = []
+        an_dists = []
+        violation_counts = 0
+        total_samples = 0
+
+        for batch in generator:
+            # Batch is [N, 3, H, W]
+            a, p, n = batch[:, 0], batch[:, 1], batch[:, 2]
+            
+            a_out = model_apply(a, weights)
+            p_out = model_apply(p, weights)
+            n_out = model_apply(n, weights)
+            
+            ap = jnp.sum((a_out - p_out)**2, axis=1)
+            an = jnp.sum((a_out - n_out)**2, axis=1)
+            
+            ap_dists.append(ap)
+            an_dists.append(an)
+            
+            violations = (ap + margin > an)
+            violation_counts += jnp.sum(violations)
+            total_samples += len(violations)
+
+        all_ap = jnp.concatenate(ap_dists)
+        all_an = jnp.concatenate(an_dists)
+        
+        mean_ap = jnp.mean(all_ap)
+        mean_an = jnp.mean(all_an)
+        violation_rate = violation_counts / total_samples
+        
+        return float(mean_ap), float(mean_an), float(violation_rate)
+
+    @staticmethod
+    def evaluate_loss_jax(weights, generator, model_apply, margin, l1_lambda):
+        """Evaluates JAX loss over a dataset."""
+        total_loss = 0.0
+        n_batches = 0
+        for batch in generator:
+            a, p, n = batch[:, 0], batch[:, 1], batch[:, 2]
+            total_loss += Utils.jax_loss_fn(weights, a, p, n, model_apply, margin, l1_lambda)
+            n_batches += 1
+        return float(total_loss / n_batches) if n_batches > 0 else 0.0

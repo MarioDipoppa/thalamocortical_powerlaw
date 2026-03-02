@@ -14,23 +14,9 @@ import scipy.io
 import traceback
 from tqdm import tqdm
 from ringach_model import ringach_VVS
+from utils import Utils
 
-# --- Loss Function ---
-def loss_fn(weights, images_a, images_p, images_n, model_apply, margin, l1_lambda):
-    a_out = model_apply(images_a, weights)
-    p_out = model_apply(images_p, weights)
-    n_out = model_apply(images_n, weights)
-    
-    # Triplet Loss
-    ap_dist = jnp.sum((a_out - p_out)**2, axis=1)
-    an_dist = jnp.sum((a_out - n_out)**2, axis=1)
-    triplet_loss = jnp.mean(jax.nn.relu(ap_dist - an_dist + margin))
-    
-    # L1 Penalty
-    if l1_lambda > 0:
-        l1_penalty = (jnp.mean(jnp.abs(a_out)) + jnp.mean(jnp.abs(p_out)) + jnp.mean(jnp.abs(n_out))) / 3.0
-        return triplet_loss + l1_lambda * l1_penalty
-    return triplet_loss
+
 
 def train_one_epoch(params, opt_state, train_generator, train_step, epoch_num):
     """Performs a single epoch of training."""
@@ -57,7 +43,7 @@ def train_one_epoch(params, opt_state, train_generator, train_step, epoch_num):
         
     return params, opt_state, epoch_loss / n_batches
 
-def train_model(params, opt_state, args, train_step, val_step,
+def train_model(params, opt_state, args, train_step, val_step, model_v1_apply,
                 batch_generator, triplets, train_start, train_end, val_start, val_end, batch_size):
     """Master training function with validation and early stopping."""
     best_val_loss = float('inf')
@@ -70,29 +56,34 @@ def train_model(params, opt_state, args, train_step, val_step,
     train_viols = []
     val_viols = []
     
-    for epoch in range(args.epochs):
+    for epoch in tqdm(range(args.epochs)):
         t0 = time.time()
         
         # create our generators for training and validation
-        train_generator = batch_generator(triplets, train_start, train_end, batch_size)
-        val_generator = batch_generator(triplets, val_start, val_end, batch_size)
+        train_generator = batch_generator(triplets, batch_size, train_start, train_end)
+        val_generator = batch_generator(triplets, batch_size, val_start, val_end)
         
         # 1. Train
         params, opt_state, train_loss = train_one_epoch(params, opt_state, train_generator, train_step, epoch + 1)
         
         # 2. Validate
-        val_loss = 0.0
-        n_val_batches = 0
-        for val_batch in val_generator:
-            a, p, n = val_batch[:, 0], val_batch[:, 1], val_batch[:, 2]
-            val_loss += val_step(params, a, p, n)
-            n_val_batches += 1
-        val_loss /= n_val_batches
+        val_loss = Utils.evaluate_loss_jax(params, val_generator, model_v1_apply, args.margin, args.l1_lambda)
         
-	# store the train/val losses
-	train_losses.append(train_loss)
-	val_losses.append(val_loss)
-        print(f"Epoch {epoch+1}/{args.epochs} - Train Loss: {train_loss:.4f} - Val Loss: {val_loss:.4f} - time: {time.time()-t0:.2f}s")
+        # 3. Benchmark violations
+        # Re-fetch generators for stats
+        train_gen_stats = batch_generator(triplets, batch_size, train_start, train_end)
+        val_gen_stats = batch_generator(triplets, batch_size, val_start, val_end)
+        
+        _, _, train_viol = Utils.compute_triplet_margin_stats_jax(params, train_gen_stats, model_v1_apply, args.margin)
+        _, _, val_viol = Utils.compute_triplet_margin_stats_jax(params, val_gen_stats, model_v1_apply, args.margin)
+        
+        # store the train/val losses and violations
+        train_losses.append(train_loss)
+        val_losses.append(val_loss)
+        train_viols.append(train_viol)
+        val_viols.append(val_viol)
+        
+        print(f"Epoch {epoch+1}/{args.epochs} - Train Loss: {train_loss:.4f} - Val Loss: {val_loss:.4f} - Train Viol: {train_viol*100:.2f}% - Val Viol: {val_viol*100:.2f}% - time: {time.time()-t0:.2f}s")
         
         # 3. Checkpoint/Early Stopping
         if val_loss < best_val_loss:
@@ -115,7 +106,31 @@ def train_model(params, opt_state, args, train_step, val_step,
                 pickle.dump(params, f)
             print(f"Periodic checkpoint saved to {periodic_path}")
                 
-    print(f"Training finished in {time.time() - start_time:.2f}s")
+    total_time = time.time() - start_time
+    print(f"Training finished in {total_time:.2f}s")
+    
+    # Final metadata storage
+    history_path = os.path.join(args.out, f"train_history_LGN{args.lgn}_V1{args.v1}.pkl")
+    metadata = {
+        "lgn": args.lgn,
+        "v1": args.v1,
+        "epochs": args.epochs,
+        "batch_size": args.batch_size,
+        "lr": args.lr,
+        "margin": args.margin,
+        "l1_lambda": args.l1_lambda,
+        "patience": args.patience,
+        "train_losses": train_losses,
+        "val_losses": val_losses,
+        "train_viols": train_viols,
+        "val_viols": val_viols,
+        "total_time": total_time,
+        "best_val_loss": best_val_loss
+    }
+    with open(history_path, "wb") as f:
+        pickle.dump(metadata, f)
+    print(f"Training history saved to {history_path}")
+    
     return params
 
 def main():
@@ -143,11 +158,6 @@ def main():
     print(f"loading {train_size} triplets with batch size {args.batch_size} for training")
     print(f"loading {n_triplets - train_size} triplets for validation")
     
-    # Batch generator for sequential batches
-    def batch_generator(arr, start_idx, end_idx, batch_size):
-        for i in range(start_idx, end_idx, batch_size):
-            batch = arr[i:i+batch_size].astype(np.float32)
-            yield batch
 
     # 2. Initialize Model and Parameters
     shape = (224, 224)
@@ -172,20 +182,20 @@ def main():
     
     @jit
     def train_step(params, opt_state, batch_a, batch_p, batch_n):
-        loss_val, grads = jax.value_and_grad(loss_fn)(params, batch_a, batch_p, batch_n, model_v1_apply, args.margin, args.l1_lambda)
+        loss_val, grads = jax.value_and_grad(Utils.jax_loss_fn)(params, batch_a, batch_p, batch_n, model_v1_apply, args.margin, args.l1_lambda)
         updates, opt_state = optimizer.update(grads, opt_state, params)
         params = optax.apply_updates(params, updates)
         return params, opt_state, loss_val
 
     @jit
     def val_step(params, batch_a, batch_p, batch_n):
-        return loss_fn(params, batch_a, batch_p, batch_n, model_v1_apply, args.margin, args.l1_lambda)
+        return Utils.jax_loss_fn(params, batch_a, batch_p, batch_n, model_v1_apply, args.margin, args.l1_lambda)
 
     # 5. Run Training
     print("Starting training loop...")
     try:
-        train_model(params, opt_state, args, train_step, val_step,
-                    batch_generator, triplets, 0, train_size, train_size, n_triplets, args.batch_size)
+        train_model(params, opt_state, args, train_step, val_step, model_v1_apply,
+                    Utils.batch_generator, triplets, 0, train_size, train_size, n_triplets, args.batch_size)
     except Exception as e:
         print("\n!!! TRAINING CRASHED !!!")
         print(f"Error: {e}")
