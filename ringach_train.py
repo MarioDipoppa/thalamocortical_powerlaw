@@ -32,16 +32,13 @@ def loss_fn(weights, images_a, images_p, images_n, model_apply, margin, l1_lambd
         return triplet_loss + l1_lambda * l1_penalty
     return triplet_loss
 
-def train_one_epoch(params, opt_state, train_indices, triplets, batch_size, train_step, epoch_num):
+def train_one_epoch(params, opt_state, train_generator, train_step, epoch_num):
     """Performs a single epoch of training."""
-    np.random.shuffle(train_indices)
     n_batches = 0
     epoch_loss = 0.0
     
     # Using tqdm for progress bar if stdout is a terminal
-    for i in range(0, len(train_indices), batch_size):
-        idx = train_indices[i:i+batch_size]
-        batch = triplets[idx] # [B, 3, H, W]
+    for batch in train_generator:
         a, p, n = batch[:, 0], batch[:, 1], batch[:, 2]
         
         params, opt_state, loss_val = train_step(params, opt_state, a, p, n)
@@ -55,34 +52,46 @@ def train_one_epoch(params, opt_state, train_indices, triplets, batch_size, trai
         n_batches += 1
         
         # Diagnostic: Frequent logging
-        if n_batches % 5 == 0:
-             print(f"  [Epoch {epoch_num}] Batch {n_batches}/{len(train_indices)//batch_size} - Current Loss: {loss_val:.4f}")
+        # if n_batches % 5 == 0:
+        #      print(f"  [Epoch {epoch_num}] Batch {n_batches}/{len(train_indices)//batch_size} - Current Loss: {loss_val:.4f}")
         
     return params, opt_state, epoch_loss / n_batches
 
-def train_model(params, opt_state, triplets, train_indices, val_indices, args, train_step, val_step):
+def train_model(params, opt_state, args, train_step, val_step,
+                batch_generator, triplets, train_start, train_end, val_start, val_end, batch_size):
     """Master training function with validation and early stopping."""
     best_val_loss = float('inf')
     wait = 0
     start_time = time.time()
+
+    # init some storage
+    train_losses = []
+    val_losses = []
+    train_viols = []
+    val_viols = []
     
     for epoch in range(args.epochs):
         t0 = time.time()
         
+        # create our generators for training and validation
+        train_generator = batch_generator(triplets, train_start, train_end, batch_size)
+        val_generator = batch_generator(triplets, val_start, val_end, batch_size)
+        
         # 1. Train
-        params, opt_state, train_loss = train_one_epoch(params, opt_state, train_indices, triplets, args.batch_size, train_step, epoch + 1)
+        params, opt_state, train_loss = train_one_epoch(params, opt_state, train_generator, train_step, epoch + 1)
         
         # 2. Validate
         val_loss = 0.0
         n_val_batches = 0
-        for i in range(0, len(val_indices), args.batch_size):
-            idx = val_indices[i:i+args.batch_size]
-            batch = triplets[idx]
-            a, p, n = batch[:, 0], batch[:, 1], batch[:, 2]
+        for val_batch in val_generator:
+            a, p, n = val_batch[:, 0], val_batch[:, 1], val_batch[:, 2]
             val_loss += val_step(params, a, p, n)
             n_val_batches += 1
         val_loss /= n_val_batches
         
+	# store the train/val losses
+	train_losses.append(train_loss)
+	val_losses.append(val_loss)
         print(f"Epoch {epoch+1}/{args.epochs} - Train Loss: {train_loss:.4f} - Val Loss: {val_loss:.4f} - time: {time.time()-t0:.2f}s")
         
         # 3. Checkpoint/Early Stopping
@@ -128,25 +137,18 @@ def main():
     
     # 1. Load and Prepare Data
     print(f"Loading data from {args.data}...")
-    #mat = scipy.io.loadmat(args.data)
-    #triplets = mat[args.data_key]
-    #if triplets.ndim == 4 and triplets.shape[1] != 3:
-    #     triplets = triplets.transpose(3, 2, 0, 1)
-    
-    triplets = np.load(args.data).astype(np.float32)
-    # Diagnostic: Check for NaNs/Infs in input data
-    if np.isnan(triplets).any() or np.isinf(triplets).any():
-         print("WARNING: Data contains NaNs or Infs! Cleaning...")
-         triplets = np.nan_to_num(triplets)
-    
-    triplets = (triplets - np.mean(triplets)) / (np.std(triplets) + 1e-8)
-    
+    triplets = np.load(args.data, mmap_mode='r')  # memory-map instead of loading all at once
     n_triplets = triplets.shape[0]
-    indices = np.random.permutation(n_triplets)
     train_size = int(0.9 * n_triplets)
-    train_indices = indices[:train_size]
-    val_indices = indices[train_size:]
+    print(f"loading {train_size} triplets with batch size {args.batch_size} for training")
+    print(f"loading {n_triplets - train_size} triplets for validation")
     
+    # Batch generator for sequential batches
+    def batch_generator(arr, start_idx, end_idx, batch_size):
+        for i in range(start_idx, end_idx, batch_size):
+            batch = arr[i:i+batch_size].astype(np.float32)
+            yield batch
+
     # 2. Initialize Model and Parameters
     shape = (224, 224)
     n_rgc_side = int(np.sqrt(args.lgn // 2.5))
@@ -182,13 +184,14 @@ def main():
     # 5. Run Training
     print("Starting training loop...")
     try:
-        train_model(params, opt_state, triplets, train_indices, val_indices, args, train_step, val_step)
+        train_model(params, opt_state, args, train_step, val_step,
+                    batch_generator, triplets, 0, train_size, train_size, n_triplets, args.batch_size)
     except Exception as e:
         print("\n!!! TRAINING CRASHED !!!")
         print(f"Error: {e}")
         traceback.print_exc()
         # Save emergency checkpoint
-        save_path = os.path.join(args.out, "emergency_checkpoint.pkl")
+        save_path = os.path.join(args.out, f"emergency_checkpoint_LGN{args.lgn}_V1{args.v1}.pkl")
         with open(save_path, "wb") as f:
             pickle.dump(params, f)
         print(f"Emergency checkpoint saved to {save_path}")

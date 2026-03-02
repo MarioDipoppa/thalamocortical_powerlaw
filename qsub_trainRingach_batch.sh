@@ -2,28 +2,28 @@
 #$ -N train-Ringach
 #$ -cwd
 #$ -V
-#$ -l h_rt=08:00:00,h_data=32G
+#$ -l h_rt=08:00:00,h_vmem=64G
 #$ -j y
 #$ -o joblog/train_Ringach.$JOB_ID.$TASK_ID
-#$ -M $USER@mail
+#$ -M sakinkirti@g.ucla.edu
 
-### Parallel Job Array for 1 combination (LGN=100) and 5 V1 dimensions
-#$ -t 1-5
-
-# Load environment
-. /u/local/Modules/default/init/modules.sh
-module load anaconda3
-conda activate tce_v2
+### Parallel Job Array for 60 combination 6 LGN dims and 10 V1 dimensions
+#$ -t 1-60
 
 # Define the grid of parameters
-LGN_VALUES=(100)
-V1_VALUES=(200 400 600 800 1000)
+LGN_VALUES=(32 64 128 256 512 1024)
+V1_VALUES=(32 64 128 256 512 1024 2048 4096 8192 16384)
+
+# optimize JAX on cpu
+export XLA_PYTHON_CLIENT_PREALLOCATE=false
+export OMP_NUM_THREADS=1
+export MKL_NUM_THREADS=1
 
 PYTHON_EXE="/u/home/s/skirti/miniforge3/envs/tce_v2/bin/python"
-DATA_PATH="/u/home/s/skirti/project-mdipoppa/thalamocortical-expansion/01_data/natural_movies/IMG_3625_patches.npy"
+DATA_PATH="/u/home/s/skirti/dipoppa-lab/dipoppa-lab/thalamocortical-expansion/01_data/natural_movies/IMG_3625_train_patches.npy"
 DATA_KEY="allPatches"
 OUT_DIR="train_results_ringach"
-BATCH_SIZE=64
+BATCH_SIZE=48
 EPOCHS=200
 LR=0.0001
 MARGIN=3.
@@ -32,9 +32,10 @@ mkdir -p $OUT_DIR
 mkdir -p joblog
 
 # Calculate indices for this specific task
+num_v1=${#V1_VALUES[@]}
 zero_indexed=$((SGE_TASK_ID - 1))
-lgn_idx=$((zero_indexed / 5))
-v1_idx=$((zero_indexed % 5))
+lgn_idx=$((zero_indexed / num_v1))
+v1_idx=$((zero_indexed % num_v1))
 
 lgn=${LGN_VALUES[$lgn_idx]}
 v1=${V1_VALUES[$v1_idx]}

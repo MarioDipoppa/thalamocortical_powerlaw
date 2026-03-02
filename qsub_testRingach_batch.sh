@@ -6,24 +6,21 @@
 #$ -j y
 #$ -o joblog/test_Ringach.$JOB_ID.$TASK_ID
 #$ -M $USER@mail
-#$ -t 1-5
+#$ -t 1-60
 
 PYTHON_EXE="/u/home/s/skirti/miniforge3/envs/tce_v2/bin/python"
-INPUT_DATA="/u/home/s/skirti/project-mdipoppa/thalamocortical-expansion/01_data/natural_movies/test.npy"
+INPUT_DATA="/u/home/s/skirti/dipoppa-lab/dipoppa-lab/thalamocortical-expansion/01_data/natural_movies/IMG_3625_test_patches.npy"
 OUT_DIR="results_ringach_grid"
-BATCH_SIZE=64
+BATCH_SIZE=48
 
 # Define the grid of parameters (5 values each)
-LGN_VALUES=(100)
-V1_VALUES=(200 400 600 800 1000)
+LGN_VALUES=(32 64 128 256 512 1024)
+V1_VALUES=(32 64 128 256 512 1024 2048 4096 8192 16384)
 
 mkdir -p $OUT_DIR
 mkdir -p joblog
 
 # Calculate indices for this specific task (1-based task ID)
-# Task 1 -> LGN[0], V1[0]
-# Task 5 -> LGN[0], V1[4]
-# Task 6 -> LGN[1], V1[0]
 zero_indexed=$((SGE_TASK_ID - 1))
 lgn_idx=$((zero_indexed / 5))
 v1_idx=$((zero_indexed % 5))
