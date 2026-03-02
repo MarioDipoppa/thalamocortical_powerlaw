@@ -91,7 +91,9 @@ def main():
     # Gini Index for V1 activations (mean over all images and images in triplets)
     # Reshaping back to [3*N, N_V1] to get flat list of activations
     v1_acts_flat = v_out.reshape(-1, v_out.shape[-1])
-    v1_gini = Utils.gini(v1_acts_flat.mean(axis=0))
+    # Apply ReLU to treat inhibited neurons as inactive (0) for sparsity
+    v1_acts_rectified = np.maximum(0, v1_acts_flat)
+    v1_gini = Utils.gini(v1_acts_rectified.mean(axis=0))
     print(f"V1 Gini Index: {v1_gini:.4f}")
     
     # Triplet-based evaluation

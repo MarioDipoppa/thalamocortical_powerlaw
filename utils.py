@@ -25,7 +25,7 @@ class Utils:
             float: the Gini index; 0 means perfect equality, 1 means maximal inequality.
         """
         if isinstance(x, (jnp.ndarray, jax.Array)):
-            x = x.astype(jnp.float64)
+            x = jnp.maximum(0, x).astype(jnp.float64)
             if jnp.all(x == 0):
                 return 0.0
             x_sorted = jnp.sort(x)
@@ -33,7 +33,7 @@ class Utils:
             index = jnp.arange(1, n + 1)
             return (2 * jnp.sum(index * x_sorted) / jnp.sum(x)) / n - (n + 1) / n
         else:
-            x = np.array(x, dtype=np.float64)
+            x = np.maximum(0, np.array(x, dtype=np.float64))
             if np.all(x == 0):
                 return 0.0
             x_sorted = np.sort(x)
