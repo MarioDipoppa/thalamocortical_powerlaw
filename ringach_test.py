@@ -38,9 +38,16 @@ def main():
     # Use dense weights as parameters (default to initial if not provided)
     params = model.LGN_V1_conn
     if args.params:
-        print(f"Loading trained parameters from {args.params}...")
-        with open(args.params, "rb") as f:
-            params = pickle.load(f)
+        if os.path.exists(args.params):
+            print(f"Loading trained parameters from {args.params}...")
+            try:
+                with open(args.params, "rb") as f:
+                    params = pickle.load(f)
+            except Exception as e:
+                print(f"Error loading parameters from {args.params}: {e}")
+                print("Falling back to initial model weights.")
+        else:
+            print(f"Warning: Parameters file {args.params} not found. Using initial model weights.")
             
     # Load input triplets using memory-mapping
     print(f"Loading data from {args.input}...")
