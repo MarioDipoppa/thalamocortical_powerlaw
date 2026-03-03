@@ -6,8 +6,9 @@
 #$ -j y
 #$ -o joblog/train_Ringach.$JOB_ID.$TASK_ID
 #$ -M sakinkirti@g.ucla.edu
+#$ -m ea
 
-### Parallel Job Array for 60 combination 6 LGN dims and 10 V1 dimensions
+### Parallel Job Array
 #$ -t 1-60
 
 # Define the grid of parameters
@@ -22,7 +23,7 @@ export MKL_NUM_THREADS=1
 PYTHON_EXE="/u/home/s/skirti/miniforge3/envs/tce_v2/bin/python"
 DATA_PATH="/u/home/s/skirti/dipoppa-lab/dipoppa-lab/thalamocortical-expansion/01_data/natural_movies/IMG_3625_train_patches.npy"
 DATA_KEY="allPatches"
-OUT_DIR="train_results_ringach"
+OUT_DIR="train_results_ringach_unconstrained"
 BATCH_SIZE=48
 EPOCHS=200
 LR=0.0001

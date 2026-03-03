@@ -2,15 +2,13 @@ import os
 import time
 import argparse
 import pickle
-import yaml
 import numpy as np
 
 import jax
 import jax.numpy as jnp
-from jax import grad, jit, vmap
+from jax import jit, vmap
 import optax
 
-import scipy.io
 import traceback
 from tqdm import tqdm
 from ringach_model import ringach_VVS
@@ -18,8 +16,6 @@ from utils import Utils
 
 # Set random seed for reproducibility in model architecture
 np.random.seed(42)
-
-
 
 def train_one_epoch(params, opt_state, train_generator, train_step, epoch_num):
     """Performs a single epoch of training."""
@@ -103,11 +99,11 @@ def train_model(params, opt_state, args, train_step, val_step, model_v1_apply,
                 break
         
         # Periodic Checkpoint (every 5 epochs)
-        if (epoch + 1) % 5 == 0:
-            periodic_path = os.path.join(args.out, f"checkpoint_epoch_{epoch+1}.pkl")
-            with open(periodic_path, "wb") as f:
-                pickle.dump(params, f)
-            print(f"Periodic checkpoint saved to {periodic_path}")
+        # if (epoch + 1) % 5 == 0:
+        #     periodic_path = os.path.join(args.out, f"checkpoint_epoch_{epoch+1}.pkl")
+        #     with open(periodic_path, "wb") as f:
+        #         pickle.dump(params, f)
+        #     print(f"Periodic checkpoint saved to {periodic_path}")
                 
     total_time = time.time() - start_time
     print(f"Training finished in {total_time:.2f}s")
@@ -160,7 +156,6 @@ def main():
     train_size = int(0.9 * n_triplets)
     print(f"loading {train_size} triplets with batch size {args.batch_size} for training")
     print(f"loading {n_triplets - train_size} triplets for validation")
-    
 
     # 2. Initialize Model and Parameters
     shape = (224, 224)

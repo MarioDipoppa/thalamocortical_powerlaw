@@ -6,6 +6,9 @@
 #$ -j y
 #$ -o joblog/test_Ringach.$JOB_ID.$TASK_ID
 #$ -M sakinkirti@g.ucla.edu
+#$ -m ea
+
+### Parallel Job Array
 #$ -t 1-60
 
 # optimize JAX on cpu
@@ -15,8 +18,8 @@ export MKL_NUM_THREADS=1
 
 PYTHON_EXE="/u/home/s/skirti/miniforge3/envs/tce_v2/bin/python"
 INPUT_DATA="/u/home/s/skirti/dipoppa-lab/dipoppa-lab/thalamocortical-expansion/01_data/natural_movies/IMG_3625_test_patches.npy"
-PARAMS_DIR="train_results_ringach"
-OUT_DIR="results_ringach_grid"
+PARAMS_DIR="train_results_ringach_unconstrained"
+OUT_DIR="results_ringach_grid_unconstrained"
 BATCH_SIZE=48
 MARGIN=3.
 TEST_TRAINED=true  # Set to false to test untrained models even if params exist
