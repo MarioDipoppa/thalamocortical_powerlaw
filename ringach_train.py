@@ -24,7 +24,9 @@ def train_one_epoch(params, opt_state, train_generator, train_step, epoch_num):
     
     # Using tqdm for progress bar if stdout is a terminal
     for batch in train_generator:
-        a, p, n = batch[:, 0], batch[:, 1], batch[:, 2]
+        # Move batch explicitly to device for performance (batch-by-batch movement)
+        batch_dev = jax.device_put(batch)
+        a, p, n = batch_dev[:, 0], batch_dev[:, 1], batch_dev[:, 2]
         
         params, opt_state, loss_val = train_step(params, opt_state, a, p, n)
         
@@ -198,7 +200,12 @@ def main():
         optax.clip_by_global_norm(1.0),
         optax.adam(learning_rate=args.lr)
     )
+    
+    # Initialize parameters and optimizer state
+    # JAX will automatically place these on the primary device (GPU)
     opt_state = optimizer.init(params)
+    params = jax.device_put(params)
+    opt_state = jax.device_put(opt_state)
     
     # 4. Define Differentiable Steps
     model_v1_apply = vmap(lambda x, w: model.forward(x, weights=w)[2], in_axes=(0, None))

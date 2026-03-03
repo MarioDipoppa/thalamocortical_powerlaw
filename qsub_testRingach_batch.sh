@@ -2,7 +2,7 @@
 #$ -N test-Ringach
 #$ -cwd
 #$ -V
-#$ -l h_rt=08:00:00,h_vmem=64G
+#$ -l gpu,RTX2080Ti,cuda=1,h_rt=08:00:00,h_vmem=32G
 #$ -j y
 #$ -o joblog/test_Ringach.$JOB_ID.$TASK_ID
 #$ -M sakinkirti@g.ucla.edu
@@ -11,7 +11,7 @@
 ### Parallel Job Array
 #$ -t 1-60
 
-# optimize JAX on cpu
+# optimize JAX
 export XLA_PYTHON_CLIENT_PREALLOCATE=false
 export OMP_NUM_THREADS=1
 export MKL_NUM_THREADS=1

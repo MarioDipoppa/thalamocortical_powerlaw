@@ -40,6 +40,7 @@ def main():
     
     # Use dense weights as parameters (default to initial if not provided)
     params = model.LGN_V1_conn
+    params = jax.device_put(params)
     print(f"Model internal weights shape: {params.shape}")
     
     if args.params:
@@ -87,8 +88,10 @@ def main():
     n_batches = (n_triplets + args.batch_size - 1) // args.batch_size
     for i, batch in enumerate(tqdm(Utils.batch_generator(triplets, args.batch_size), total=n_batches)):
         # batch is [B, 3, H, W], flatten to [3B, H, W] for the model
+        # Move batch to GPU explicitly
         B = batch.shape[0]
-        flattened_batch = batch.reshape(-1, 224, 224)
+        batch_dev = jax.device_put(batch)
+        flattened_batch = batch_dev.reshape(-1, 224, 224)
         
         r_batch, l_batch, v_batch = jit_forward(flattened_batch, params)
         
