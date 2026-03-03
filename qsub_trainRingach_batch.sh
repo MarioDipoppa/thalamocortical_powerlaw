@@ -43,6 +43,23 @@ v1=${V1_VALUES[$v1_idx]}
 
 echo "Task $SGE_TASK_ID: Training LGN=$lgn, V1=$v1"
 
+# Resume/Skip Logic
+HISTORY_FILE="$OUT_DIR/train_history_LGN${lgn}_V1${v1}.pkl"
+if [ -f "$HISTORY_FILE" ]; then
+    echo "Task $SGE_TASK_ID (LGN=$lgn, V1=$v1) already has a history file. Skipping."
+    exit 0
+fi
+
+# Check for early stopping in existing logs
+# Note: This is an extra precaution for models that finished but history wasn't saved (unlikely but possible)
+latest_log=$(ls -t joblog/train_Ringach.*.$SGE_TASK_ID 2>/dev/null | head -n 1)
+if [ -n "$latest_log" ]; then
+    if grep -q "Early stopping triggered." "$latest_log"; then
+        echo "Task $SGE_TASK_ID (LGN=$lgn, V1=$v1) previously early-stopped according to log. Skipping."
+        exit 0
+    fi
+fi
+
 $PYTHON_EXE ringach_train.py \
     --lgn $lgn \
     --v1 $v1 \
