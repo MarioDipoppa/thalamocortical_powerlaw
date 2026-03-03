@@ -18,7 +18,7 @@ export MKL_NUM_THREADS=1
 
 PYTHON_EXE="/u/home/s/skirti/miniforge3/envs/tce_v2/bin/python"
 INPUT_DATA="/u/home/s/skirti/dipoppa-lab/dipoppa-lab/thalamocortical-expansion/01_data/natural_movies/IMG_3625_test_patches.npy"
-PARAMS_DIR="train_results_ringach_unconstrained"
+PARAMS_DIR="/u/home/s/skirti/dipoppa-lab/dipoppa-lab/thalamocortical-expansion/02_code/thalamocortical_powerlaw/train_results_ringach_unconstrained"
 OUT_DIR="results_ringach_grid_unconstrained"
 BATCH_SIZE=48
 MARGIN=3.
