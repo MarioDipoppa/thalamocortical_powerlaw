@@ -10,6 +10,9 @@ from tqdm import tqdm
 from ringach_model import ringach_VVS
 from utils import Utils
 
+# Set random seed for reproducibility in model architecture
+np.random.seed(42)
+
 def main():
     parser = argparse.ArgumentParser(description="Test Ringach model with triplets and benchmarking")
     parser.add_argument("--lgn", type=int, required=True, help="Number of LGN neurons (RGC is 0.4x)")
@@ -26,7 +29,7 @@ def main():
     
     # Configuration
     shape = (224, 224)
-    n_rgc_side = int(np.sqrt(args.lgn * 2 // 2.5))
+    n_rgc_side = int(np.sqrt(args.lgn // 2.5))
     v1_side = int(np.sqrt(args.v1))
     print(f"Initializing model with LGN={args.lgn} (RGC_grid={n_rgc_side}) and V1_grid={v1_side}...")
     
@@ -37,12 +40,23 @@ def main():
     
     # Use dense weights as parameters (default to initial if not provided)
     params = model.LGN_V1_conn
+    print(f"Model internal weights shape: {params.shape}")
+    
     if args.params:
         if os.path.exists(args.params):
             print(f"Loading trained parameters from {args.params}...")
             try:
                 with open(args.params, "rb") as f:
-                    params = pickle.load(f)
+                    loaded_params = pickle.load(f)
+                print(f"Loaded parameters shape: {loaded_params.shape}")
+                
+                if loaded_params.shape != params.shape:
+                    print(f"Warning: Loaded shape {loaded_params.shape} mismatches model shape {params.shape}!")
+                    print("This usually means the LGN/V1 architecture in the trained file doesn't match the current config.")
+                    print("Proceeding with model's initial weights instead.")
+                else:
+                    params = loaded_params
+                    print("Successfully mapped trained weights to model.")
             except Exception as e:
                 print(f"Error loading parameters from {args.params}: {e}")
                 print("Falling back to initial model weights.")

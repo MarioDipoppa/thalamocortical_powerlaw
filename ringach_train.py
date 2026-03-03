@@ -16,6 +16,9 @@ from tqdm import tqdm
 from ringach_model import ringach_VVS
 from utils import Utils
 
+# Set random seed for reproducibility in model architecture
+np.random.seed(42)
+
 
 
 def train_one_epoch(params, opt_state, train_generator, train_step, epoch_num):
