@@ -4,7 +4,7 @@
 #$ -V
 #$ -l gpu,RTX2080Ti,cuda=2,h_rt=12:00:00,h_vmem=32G,highp=TRUE
 #$ -j y
-#$ -o joblog/train_Ringach.$JOB_ID.$TASK_ID
+#$ -o joblog/unconstrained_margin0.$JOB_ID.$TASK_ID
 #$ -M sakinkirti@g.ucla.edu
 #$ -m bea
 
