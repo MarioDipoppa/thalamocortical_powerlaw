@@ -115,7 +115,8 @@ def main():
     # Gini Index for V1 activations (mean over all images and images in triplets)
     # Reshaping back to [3*N, N_V1] to get flat list of activations
     v1_acts_flat = v_out.reshape(-1, v_out.shape[-1])
-    # Apply ReLU to treat inhibited neurons as inactive (0) for sparsity
+    # Apply ReLU to treat inhibited neurons as inactive (0) for sparsity. 
+    # this line shouldn't do anything functional since we ReLU the V1 outputs anyways
     v1_acts_rectified = np.maximum(0, v1_acts_flat)
     v1_gini = Utils.gini(v1_acts_rectified.mean(axis=0))
     print(f"V1 Gini Index: {v1_gini:.4f}")
@@ -129,9 +130,9 @@ def main():
     a_out = v_out[:, 0]
     p_out = v_out[:, 1]
     n_out = v_out[:, 2]
-    
-    ap_dist = np.sum((a_out - p_out)**2, axis=1)
-    an_dist = np.sum((a_out - n_out)**2, axis=1)
+
+    ap_dist = np.sum((a_out - p_out)**2, axis=1) / np.sqrt(args.v1)
+    an_dist = np.sum((a_out - n_out)**2, axis=1) / np.sqrt(args.v1)
     
     test_loss = np.mean(np.maximum(ap_dist - an_dist + args.margin, 0))
     if args.l1_lambda > 0:

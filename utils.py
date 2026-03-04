@@ -210,7 +210,8 @@ class Utils:
         a_out = model_apply(images_a, weights)
         p_out = model_apply(images_p, weights)
         n_out = model_apply(images_n, weights)
-        
+        print(a_out.shape)        
+
         # Triplet Loss
         ap_dist = jnp.sum((a_out - p_out)**2, axis=1)
         an_dist = jnp.sum((a_out - n_out)**2, axis=1)

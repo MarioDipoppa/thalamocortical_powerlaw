@@ -148,5 +148,5 @@ class ringach_VVS:
         """
         r = self.rgc_forward(x)
         l = self.lgn_forward(r)
-        v = jnp.nn.ReLU(self.v1_forward(l, weights=weights))
+        v = jax.nn.relu(self.v1_forward(l, weights=weights))
         return (r, l, v)
