@@ -210,7 +210,6 @@ class Utils:
         a_out = model_apply(images_a, weights)
         p_out = model_apply(images_p, weights)
         n_out = model_apply(images_n, weights)
-        print(a_out.shape)        
 
         # Triplet Loss
         ap_dist = jnp.sum((a_out - p_out)**2, axis=1)
@@ -224,8 +223,8 @@ class Utils:
         return triplet_loss
 
     @staticmethod
-    def compute_triplet_margin_stats_jax(weights, generator, model_apply, margin=0.2):
-        """Computes triplet statistics using JAX."""
+    def compute_triplet_margin_stats_jax(weights, generator, model_apply, margin=0.2, sharding=None):
+        """Computes triplet statistics using JAX with optional sharding for multi-GPU."""
         ap_dists = []
         an_dists = []
         violation_counts = 0
@@ -233,7 +232,8 @@ class Utils:
 
         for batch in generator:
             # Batch is [N, 3, H, W]
-            a, p, n = batch[:, 0], batch[:, 1], batch[:, 2]
+            batch_dev = jax.device_put(batch, sharding) if sharding else batch
+            a, p, n = batch_dev[:, 0], batch_dev[:, 1], batch_dev[:, 2]
             
             a_out = model_apply(a, weights)
             p_out = model_apply(p, weights)
@@ -259,12 +259,13 @@ class Utils:
         return float(mean_ap), float(mean_an), float(violation_rate)
 
     @staticmethod
-    def evaluate_loss_jax(weights, generator, model_apply, margin, l1_lambda):
-        """Evaluates JAX loss over a dataset."""
+    def evaluate_loss_jax(weights, generator, model_apply, margin, l1_lambda, sharding=None):
+        """Evaluates JAX loss over a dataset with optional sharding."""
         total_loss = 0.0
         n_batches = 0
         for batch in generator:
-            a, p, n = batch[:, 0], batch[:, 1], batch[:, 2]
+            batch_dev = jax.device_put(batch, sharding) if sharding else batch
+            a, p, n = batch_dev[:, 0], batch_dev[:, 1], batch_dev[:, 2]
             total_loss += Utils.jax_loss_fn(weights, a, p, n, model_apply, margin, l1_lambda)
             n_batches += 1
         return float(total_loss / n_batches) if n_batches > 0 else 0.0

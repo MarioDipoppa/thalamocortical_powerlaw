@@ -7,6 +7,8 @@ import numpy as np
 import jax
 import jax.numpy as jnp
 from jax import jit, vmap
+from jax.sharding import Mesh, PartitionSpec as P, NamedSharding
+from jax.experimental import mesh_utils
 import optax
 
 import traceback
@@ -24,8 +26,10 @@ def train_one_epoch(params, opt_state, train_generator, train_step, epoch_num):
     
     # Using tqdm for progress bar if stdout is a terminal
     for batch in train_generator:
-        # Move batch explicitly to device for performance (batch-by-batch movement)
-        batch_dev = jax.device_put(batch)
+        # Move batch explicitly to device (replicated across GPUs for model sharding)
+        # We use jax.device_put with a replicated sharding or None (default is reasonable)
+        # But to be explicit for model sharding:
+        batch_dev = jax.device_put(batch, train_generator.sharding if hasattr(train_generator, 'sharding') else None)
         a, p, n = batch_dev[:, 0], batch_dev[:, 1], batch_dev[:, 2]
         
         params, opt_state, loss_val = train_step(params, opt_state, a, p, n)
@@ -48,7 +52,7 @@ def train_model(params, opt_state, args, train_step, val_step, model_v1_apply,
                 batch_generator, triplets, train_start, train_end, val_start, val_end, batch_size,
                 start_epoch=0, best_val_loss=float('inf'), wait=0,
                 train_losses=None, val_losses=None, train_viols=None, val_viols=None,
-                start_time_offset=0):
+                start_time_offset=0, sharding=None):
     """Master training function with validation and early stopping."""
     if train_losses is None: train_losses = []
     if val_losses is None: val_losses = []
@@ -68,15 +72,16 @@ def train_model(params, opt_state, args, train_step, val_step, model_v1_apply,
         params, opt_state, train_loss = train_one_epoch(params, opt_state, train_generator, train_step, epoch + 1)
         
         # 2. Validate
-        val_loss = Utils.evaluate_loss_jax(params, val_generator, model_v1_apply, args.margin, args.l1_lambda)
+        # Ensure validation generator also uses replicated sharding
+        val_loss = Utils.evaluate_loss_jax(params, val_generator, model_v1_apply, args.margin, args.l1_lambda, sharding=sharding)
         
         # 3. Benchmark violations
         # Re-fetch generators for stats
         train_gen_stats = batch_generator(triplets, batch_size, train_start, train_end)
         val_gen_stats = batch_generator(triplets, batch_size, val_start, val_end)
         
-        _, _, train_viol = Utils.compute_triplet_margin_stats_jax(params, train_gen_stats, model_v1_apply, args.margin)
-        _, _, val_viol = Utils.compute_triplet_margin_stats_jax(params, val_gen_stats, model_v1_apply, args.margin)
+        _, _, train_viol = Utils.compute_triplet_margin_stats_jax(params, train_gen_stats, model_v1_apply, args.margin, sharding=sharding)
+        _, _, val_viol = Utils.compute_triplet_margin_stats_jax(params, val_gen_stats, model_v1_apply, args.margin, sharding=sharding)
         
         # store the train/val losses and violations
         train_losses.append(train_loss)
@@ -194,7 +199,23 @@ def main():
     # Use dense weights as parameters
     params = model.LGN_V1_conn
     
-    # 3. Setup Optimizer with Gradient Clipping
+    # 3. Setup Sharding Mesh
+    devices = jax.devices()
+    print(f"Detected {len(devices)} devices: {devices}")
+    mesh = Mesh(mesh_utils.create_device_mesh((len(devices),)), axis_names=('model',))
+    
+    # Define Shardings
+    # Shard model weights and activations along the neuron/filter axis
+    neuron_sharding = NamedSharding(mesh, P('model', None))
+    filter_sharding = NamedSharding(mesh, P('model', None, None))
+    replicated_sharding = NamedSharding(mesh, P())
+    
+    # Shard RGC components
+    model.RGC_activations = jax.device_put(model.RGC_activations, filter_sharding)
+    model.RGC_on_mask = jax.device_put(model.RGC_on_mask, filter_sharding)
+    model.LGN_RGC_idx_jnp = jax.device_put(model.LGN_RGC_idx_jnp, replicated_sharding) # Replicated indexing
+    
+    # 4. Setup Optimizer with Gradient Clipping
     # Clipping prevents exploding gradients that can sometimes crash the XLA executor silently.
     optimizer = optax.chain(
         optax.clip_by_global_norm(1.0),
@@ -202,12 +223,15 @@ def main():
     )
     
     # Initialize parameters and optimizer state
-    # JAX will automatically place these on the primary device (GPU)
+    # Shard weights along the V1 neuron dimension (axis 0)
     opt_state = optimizer.init(params)
-    params = jax.device_put(params)
-    opt_state = jax.device_put(opt_state)
+    params = jax.device_put(params, neuron_sharding)
+    opt_state = jax.device_put(opt_state, neuron_sharding)
     
-    # 4. Define Differentiable Steps
+    # Attach sharding info to generators for convenience
+    setattr(Utils.batch_generator, 'sharding', replicated_sharding)
+
+    # 5. Define Differentiable Steps
     model_v1_apply = vmap(lambda x, w: model.forward(x, weights=w)[2], in_axes=(0, None))
     
     @jit
@@ -321,6 +345,10 @@ def main():
                 except Exception as e:
                     print(f"Bootstrap failed: {e}")
 
+    # Shard parameters and optimizer state (after loading/initializing)
+    params = jax.device_put(params, neuron_sharding)
+    opt_state = jax.device_put(opt_state, neuron_sharding)
+
     # 6. Run Training
     print("Starting training loop...")
     try:
@@ -331,7 +359,7 @@ def main():
                     Utils.batch_generator, triplets, 0, train_size, train_size, n_triplets, args.batch_size,
                     start_epoch=start_epoch, best_val_loss=best_val_loss, wait=wait,
                     train_losses=train_losses, val_losses=val_losses, train_viols=train_viols, val_viols=val_viols,
-                    start_time_offset=start_time_offset)
+                    start_time_offset=start_time_offset, sharding=replicated_sharding)
     except Exception as e:
         print("\n!!! TRAINING CRASHED !!!")
         print(f"Error: {e}")
