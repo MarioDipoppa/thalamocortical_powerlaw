@@ -9,8 +9,7 @@
 #$ -m bea
 
 ### Parallel Job Array
-#$ -t 1-24
-# 1-60
+#$ -t 1-60
 
 # load the right modules
 module load gcc/11.3.0
@@ -18,8 +17,8 @@ module load cuda/12.3
 module load cudnn/8.9.7
 
 # Define the grid of parameters
-LGN_VALUES=(256 512 1024) #(32 64 128 256 512 1024)
-V1_VALUES=(64 256 512 1024 2048 4096 8192 16384) #(32 64 128 256 512 1024 2048 4096 8192 16384)
+LGN_VALUES=(32 64 128 256 512 1024)
+V1_VALUES=(32 64 128 256 512 1024 2048 4096 8192 16384)
 
 # optimize JAX on cpu
 export XLA_PYTHON_CLIENT_PREALLOCATE=false
@@ -29,7 +28,7 @@ export MKL_NUM_THREADS=1
 PYTHON_EXE="/u/home/s/skirti/miniforge3/envs/tce_v2/bin/python"
 DATA_PATH="/u/home/s/skirti/scratch/dipoppa-lab/thalamocortical-expansion/01_data/natural_movies/IMG_3625_train_patches.npy"
 DATA_KEY="allPatches"
-OUT_DIR="train_results_ringach_unconstrained"
+OUT_DIR="train_results_ringach_unconstrained_margin0"
 BATCH_SIZE=48
 EPOCHS=200
 LR=0.0001
