@@ -29,6 +29,14 @@ def pad_to_multiple(x, multiple, axis=0):
     pad_width[axis] = (0, pad_size)
     return jnp.pad(x, pad_width, mode='constant', constant_values=0)
 
+def shard_pytree(tree, sharding, replicated_sharding):
+    """Shards a pytree, applying 'sharding' to arrays and 'replicated_sharding' to scalars."""
+    def _shard_leaf(leaf):
+        if not hasattr(leaf, 'shape') or len(leaf.shape) < 2:
+            return jax.device_put(leaf, replicated_sharding)
+        return jax.device_put(leaf, sharding)
+    return jax.tree_map(_shard_leaf, tree)
+
 def train_one_epoch(params, opt_state, train_generator, train_step, epoch_num):
     """Performs a single epoch of training."""
     n_batches = 0
@@ -264,8 +272,8 @@ def main():
     # Initialize parameters and optimizer state
     # Shard weights along the V1 neuron dimension (axis 0)
     opt_state = optimizer.init(params)
-    params = jax.device_put(params, neuron_sharding)
-    opt_state = jax.device_put(opt_state, neuron_sharding)
+    params = shard_pytree(params, neuron_sharding, replicated_sharding)
+    opt_state = shard_pytree(opt_state, neuron_sharding, replicated_sharding)
     
     # Attach sharding info to generators for convenience
     setattr(Utils.batch_generator, 'sharding', replicated_sharding)
@@ -385,8 +393,8 @@ def main():
                     print(f"Bootstrap failed: {e}")
 
     # Shard parameters and optimizer state (after loading/initializing)
-    params = jax.device_put(params, neuron_sharding)
-    opt_state = jax.device_put(opt_state, neuron_sharding)
+    params = shard_pytree(params, neuron_sharding, replicated_sharding)
+    opt_state = shard_pytree(opt_state, neuron_sharding, replicated_sharding)
 
     # 6. Run Training
     print("Starting training loop...")
