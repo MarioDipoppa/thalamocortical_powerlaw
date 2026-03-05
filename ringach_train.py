@@ -19,6 +19,16 @@ from utils import Utils
 # Set random seed for reproducibility in model architecture
 np.random.seed(42)
 
+def pad_to_multiple(x, multiple, axis=0):
+    """Pads an array along a specific axis to be a multiple of 'multiple'."""
+    size = x.shape[axis]
+    if size % multiple == 0:
+        return x
+    pad_size = multiple - (size % multiple)
+    pad_width = [(0, 0)] * x.ndim
+    pad_width[axis] = (0, pad_size)
+    return jnp.pad(x, pad_width, mode='constant', constant_values=0)
+
 def train_one_epoch(params, opt_state, train_generator, train_step, epoch_num):
     """Performs a single epoch of training."""
     n_batches = 0
@@ -95,10 +105,13 @@ def train_model(params, opt_state, args, train_step, val_step, model_v1_apply,
         is_best = False
         if val_loss < best_val_loss:
             best_val_loss = val_loss
-            # Save best params
+            # Save best params (slice back to original size for the user)
             save_path = os.path.join(args.out, f"best_params_LGN{args.lgn}_V1{args.v1}.pkl")
             with open(save_path, "wb") as f:
-                pickle.dump(params, f)
+                # Use a slice to remove padding before saving
+                original_v1 = params.shape[0] if not hasattr(args, 'original_v1') else args.original_v1
+                original_lgn = params.shape[1] if not hasattr(args, 'original_lgn') else args.original_lgn
+                pickle.dump(np.array(params[:original_v1, :original_lgn]), f)
             wait = 0
             is_best = True
         else:
@@ -209,6 +222,32 @@ def main():
     neuron_sharding = NamedSharding(mesh, P('model', None))
     filter_sharding = NamedSharding(mesh, P('model', None, None))
     replicated_sharding = NamedSharding(mesh, P())
+    
+    # Pad components to be divisible by the number of devices (model sharding requirement)
+    n_devices = len(devices)
+    original_rgc_size = model.RGC_activations.shape[0]
+    model.RGC_activations = pad_to_multiple(model.RGC_activations, n_devices, axis=0)
+    model.RGC_on_mask = pad_to_multiple(model.RGC_on_mask, n_devices, axis=0)
+    # Note: LGN_RGC_idx_jnp doesn't need padding as it's replicated and only used for indexing
+    
+    # Store the original dimensions for results (excluding padding)
+    original_v1_size = params.shape[0]
+    original_lgn_size = params.shape[1]
+    
+    # Pad V1 dimension (rows)
+    params = pad_to_multiple(params, n_devices, axis=0)
+    # Pad LGN dimension (columns) if RGC was padded
+    # (The first part of LGN is RGC_act, which is size n_RGC_padded)
+    if model.RGC_activations.shape[0] != original_rgc_size:
+         # Pad axis 1 to match what enters v1_forward
+         r_dummy = jnp.zeros(model.RGC_activations.shape[0])
+         l_dummy = model.lgn_forward(r_dummy)
+         if params.shape[1] != len(l_dummy):
+             params = pad_to_multiple(params, len(l_dummy), axis=1)
+
+    # Add original sizes to args so train_model can slice back
+    args.original_v1 = original_v1_size
+    args.original_lgn = original_lgn_size
     
     # Shard RGC components
     model.RGC_activations = jax.device_put(model.RGC_activations, filter_sharding)
