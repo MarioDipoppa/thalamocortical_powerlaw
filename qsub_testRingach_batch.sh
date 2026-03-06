@@ -1,10 +1,10 @@
 #!/bin/bash
-#$ -N test-Ringach
+#$ -N uncon-m0
 #$ -cwd
 #$ -V
 #$ -l gpu,RTX2080Ti,cuda=1,h_rt=02:00:00,h_vmem=32G
 #$ -j y
-#$ -o joblog/test_Ringach.$JOB_ID.$TASK_ID
+#$ -o joblog/uncon-m0.$JOB_ID.$TASK_ID
 #$ -M sakinkirti@g.ucla.edu
 #$ -m a
 
@@ -21,13 +21,14 @@ module load gcc/11.3.0
 module load cuda/12.3
 module load cudnn/8.9.7
 
+# changes based on which model/margin value to test
 PYTHON_EXE="/u/home/s/skirti/miniforge3/envs/tce_v2/bin/python"
 INPUT_DATA="/u/home/s/skirti/scratch/dipoppa-lab/thalamocortical-expansion/01_data/natural_movies/IMG_3625_test_patches.npy"
-PARAMS_DIR="/u/home/s/skirti/scratch/dipoppa-lab/thalamocortical-expansion/02_code/thalamocortical_powerlaw/train_results_ringach_unconstrained"
-OUT_DIR="results_ringach_grid_probabilistic"
+PARAMS_DIR="/u/home/s/skirti/scratch/dipoppa-lab/thalamocortical-expansion/02_code/thalamocortical_powerlaw/train_unconstrained_margin0"
+OUT_DIR="results_unconstrained_margin0"
 BATCH_SIZE=48
 MARGIN=0.
-TEST_TRAINED=false  # Set to false to test untrained models even if params exist
+TEST_TRAINED=true  # Set to false to test untrained models even if params exist
 
 # Define the grid of parameters
 LGN_VALUES=(32 64 128 256 512 1024)

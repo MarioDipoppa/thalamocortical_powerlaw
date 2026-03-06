@@ -205,7 +205,7 @@ class Utils:
             yield batch
 
     @staticmethod
-    def jax_loss_fn(weights, images_a, images_p, images_n, model_apply, margin, l1_lambda):
+    def jax_loss_fn(weights, images_a, images_p, images_n, model_apply, margin, lambda_l1, lambda_spatial, lgn_v1_distance_matrix):
         """JAX implementation of Triplet Loss with optional L1 penalty."""
         a_out = model_apply(images_a, weights)
         p_out = model_apply(images_p, weights)
@@ -216,11 +216,17 @@ class Utils:
         an_dist = jnp.sum((a_out - n_out)**2, axis=1)
         triplet_loss = jnp.mean(jax.nn.relu(ap_dist - an_dist + margin))
         
+        # distance penalty
+        spatial_penalty = 0
+        if lambda_spatial > 0:
+            spatial_penalty = np.sum((weights**2) * lgn_v1_distance_matrix)
+        
         # L1 Penalty
-        if l1_lambda > 0:
+        l1_penalty = 0
+        if lambda_l1 > 0:
             l1_penalty = (jnp.mean(jnp.abs(a_out)) + jnp.mean(jnp.abs(p_out)) + jnp.mean(jnp.abs(n_out))) / 3.0
-            return triplet_loss + l1_lambda * l1_penalty
-        return triplet_loss
+            
+        return triplet_loss + (lambda_l1 * l1_penalty) + (lambda_spatial * spatial_penalty)
 
     @staticmethod
     def compute_triplet_margin_stats_jax(weights, generator, model_apply, margin=0.2, sharding=None):

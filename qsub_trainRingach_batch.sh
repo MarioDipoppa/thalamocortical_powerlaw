@@ -4,12 +4,17 @@
 #$ -V
 #$ -l gpu,RTX2080Ti,cuda=2,h_rt=12:00:00,h_vmem=32G
 #$ -j y
-#$ -o joblog/unconstrained_margin0.$JOB_ID.$TASK_ID
+#$ -o joblog/unconstrained_margin3.$JOB_ID.$TASK_ID
 #$ -M sakinkirti@g.ucla.edu
 #$ -m bea
 
 ### Parallel Job Array
 #$ -t 1-60
+
+# RTX2080Ti is older gpu arch, so disable new NCCL stuff
+export NCCL_P2P_DISABLE=1
+export NCCL_IB_DISABLE=1
+LD_LIBRARY_PATH=$CONDA_PREFIX/lib/python3.10/site-packages/nvidia/nccl/lib:$LD_LIBRARY_PATH
 
 # load the right modules
 module load gcc/11.3.0
@@ -28,11 +33,11 @@ export MKL_NUM_THREADS=1
 PYTHON_EXE="/u/home/s/skirti/miniforge3/envs/tce_v2/bin/python"
 DATA_PATH="/u/home/s/skirti/scratch/dipoppa-lab/thalamocortical-expansion/01_data/natural_movies/IMG_3625_train_patches.npy"
 DATA_KEY="allPatches"
-OUT_DIR="train_results_ringach_unconstrained_margin0"
+OUT_DIR="train_results_ringach_unconstrained_margin3"
 BATCH_SIZE=48
 EPOCHS=200
 LR=0.0001
-MARGIN=3.
+MARGIN=0.
 
 mkdir -p $OUT_DIR
 mkdir -p joblog
