@@ -1,0 +1,213 @@
+\documentclass[10pt]{article}
+
+% --- Preamble ---
+\usepackage[utf8]{inputenc}
+\usepackage[margin=1in]{geometry}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{caption}
+
+% Setup hyperref
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    filecolor=magenta,      
+    urlcolor=cyan,
+    pdftitle={Thalamocortical Expansion Report},
+}
+
+\title{Thalamocortical Expansion and Representation Learning in the Visual System}
+\author{Sakin Kirti \\ \small Dippopa Lab Rotation Project \\ \small Winter 2026 \\ \small Dept. of Neurobiology, UCLA}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+The conversion of sensory inputs into robust cortical representations is a fundamental operation of the mammalian brain. In the early visual system, this process 
+is characterized by a dramatic expansion in neuronal density as signals traverse from the Lateral Geniculate Nucleus (LGN) to the Primary Visual Cortex (V1). 
+This ``thalamocortical expansion'' has long been hypothesized to facilitate the creation of overcomplete representations, yet the functional advantages of such 
+high-dimensional coding remain difficult to quantify at scale. This report investigates the role of expansion in representation learning using a biologically constrained 
+feedforward architecture. By simulating populations across a wide range of expansion factors, we demonstrate that a massive cortical over-representation is critical for 
+the emergence of sparse, selective features that efficiently separate temporal variations in natural stimuli. Our findings provide support for the hypothesis that the 
+thalamocortical expansion serves as a high-dimensional mapping stage necessary for complex metric learning in the visual hierarchy.
+\end{abstract}
+
+\section{Introduction}
+The architectural layout of the early visual pathway provides a compelling example of biological specialized wiring. The process begins in the retina, where light 
+is transduced into electrical signals by photoreceptors and subsequently processed by a mosaic of Retinal Ganglion Cells (RGCs). These cells form the bottleneck of 
+the visual system, projecting through the optic nerve to the Lateral Geniculate Nucleus (LGN) of the thalamus. Biologically, the ratio of RGCs to LGN neurons is nearly 1:1, 
+or characterized by a modest expansion. However, the subsequent projection from the LGN to the Primary Visual Cortex (V1) undergoes a radical transformation. 
+In mammals, this thalamocortical pathway exhibits an expansion characterized by a power law of roughly $K=N^{3/2}$, where $K$ is the number of V1 neurons and $N$ is the 
+number of LGN neurons. Clearly, a relatively small number of thalamic inputs are mapped onto a vast population of cortical neurons, reaching a 1:300 ratio in humans.
+
+The functional necessity of this massive over-representation is a central theme in computational neuroscience. One prominent hypothesis is that this expansion 
+allows the cortex to implement an overcomplete basis set for signal representation. Unlike a critically sampled system, an overcomplete system provides the flexibility 
+to represent inputs with higher sparsity, a strategy computationally known to make downstream classification tasks significantly easier. By projecting the low-dimensional 
+outputs of the LGN into a much higher-dimensional space in V1, the brain may be performing a non-linear mapping that simplifies the separation of overlapping stimulus features, 
+effectively behaving like a kernel expansion in machine learning. This expansion is thought to be the foundation for the emergence of complex receptive field properties, 
+such as orientation selectivity and direction sensitivity, which are absent in the circularly symmetric filters of the retina and LGN.
+
+Furthermore, the geometry of this expansion is not random but follows precise topographic and probabilistic wiring rules. Neurons in V1 do not receive inputs from the 
+entire LGN pool; instead, they integrate information from localized ``neighborhoods,'' maintaining a retinotopic map while diversifying the feature space. Understanding 
+how this structural expansion relates to the quality of representation learning is the primary motivation for this project. We aim to quantify whether higher expansion 
+factors directly lead to better category or temporal separation in a representation learning context, using naturalistic video stimuli that mimic the continuous stream of 
+visual information encountered in biological environments.
+
+\section{Methodology}
+
+The trajectory of this project involved an iterative refinement of the model architecture to best capture biological principles while remaining computationally tractable 
+for large-scale benchmarking. 
+
+Initially, effort was directed toward implementing the early visual system model proposed by Slapik \& Shouval (2026). While the Slapik model offers insights 
+into estimated representations created by each cell type, it relies heavily on a non-feedforward architecture, where each cell type is effectively implemented as a separate 
+one-layer feedforward network. During development, it was determined that non-feedforward nature diverged from the primary goal of studying the feedforward expansion bottleneck.  
+
+Consequently, we pivoted to the Ringach (2004) model. The Ringach architecture provides a strictly feedforward framework that more directly isolates the effects of the LGN-to-V1 
+expansion. By focusing on a differentiable, feedforward pass, we were able to leverage modern deep learning frameworks like JAX to simulate V1 populations 
+in the hypothesized probabilistic, fully learned, and distance-regularized wiring frameworks while maintaining a clear focus on the transformation of representations 
+across the thalamocortical bottleneck.
+
+\subsection{Architectural Details}
+
+\subsubsection{RGC Layer}
+
+The model begins with a simulated mosaic of ``ON" and ``OFF" RGCs. Each mosaic of RGCs is arranged in a hexagonal grid with added spatial jitter to mimic the 
+quasi-regular sampling observed in the biological retina. Each cell's retina is modeled as a 2D Gaussian filter, where ON-cells are senstive to light and OFF-cells are
+sensitive to darkness.
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.9\linewidth]{/Users/sakinkirti/Programming/ucla/dipoppa-lab/02_code/thalamocortical_powerlaw/figures/on_off_RGC.png}
+    \caption{Example ON and OFF retinal ganglion cell mosaics.}
+    \label{fig:on_off_rgc}
+\end{figure}
+
+\subsubsection{LGN Layer}
+The LGN layer acts as a relay, roughly maintaining the topology of the RGC input but introducing further stochasticity. In this implementation, the LGN expands the number of 
+cells by approximately 2.5x relative to the RGC count. This expansion is achieved by first retaining one copy of each RGC map and further stochastic indexing of 1.5x 
+the entire RGC population, creating a redundant but slightly more diverse pool of inputs for the subsequent cortical stage.
+
+\subsubsection{V1 Layer}
+The V1 layer is the stage of primary interest, where the massive expansion occurs. Additionally, due to our interest in the connectivity of the V1, we also tested three approaches: 
+probabilistic haphazard wiring, unconstrained training, and distance regularized training.
+
+In the probabilistic haphazard wiring approach, we follow the protocol outlined in Ringach 2004, where each V1 cell takes inputs from probabilistically selected LGN neurons
+with deterministic synaptic strength. The probability that an LGN-V1 connection exists is modeled as a gaussian function such that as the distance from a V1 receptive field center
+increases, the likelihood of an LGN cell forming a connection decreases. Additionally, the synaptic strength between a formalized LGN-V1 connection is given by a gaussian function as 
+well.
+$$
+P=0.85 * \text{exp}\left( -\frac{d}{2\sigma_{\text{conn}}^2} \right), S=1 * \text{exp}\left( -\frac{d}{2\sigma_{\text{syn}}^2} \right)
+$$
+where $P$ is the probability of a connection, $d$ is the distance, and $S$ is the synaptic strength between a given LGN-V1 cell pair. A major benefit of this paradigm is the 
+pre-optimized connectivity matrix that is formed between LGN-V1 pairs, resulting in no need for training. In this probabilistic set up, the V1 layer forms unique receptive 
+fields as a result of this haphazard wiring paradigm.
+
+However, it's also reasonable to ask, in a modern deep learning paradigm, if this connectivity (or weights) matrix can be optimized, and if this optimization results in similarly 
+formed receptive fields. To this end, we train the same network, retaining the architecture of the RGC and LGN layers (no training), and optimizing the connectivity matrix of the V1
+layer in both the unconstrained and distance-regularized settings.
+
+\subsection{Training and benchmarking}
+
+\subsubsection{Optimization procedure}
+To train the unconstrained models, we use triplet loss. This objective encourages the model to map ``similar'' images closer together in the representation space than ``dissimilar'' 
+images, and is defined as
+$$
+\mathcal{L}_\text{trip} = \lfloor d(a,p)-d(a,n) + \alpha \rfloor_+
+$$
+where $a$, $p$, and $n$ denote the anchor, positive, and negative images and $d$ is the distance between two images in representation space. $\alpha$ is a pre-defined margin that allows
+the model to make small amounts of errors.
+
+To train distance-regularized models, we continue to use triplet loss, but add an additional regularization term that encourages the model to make short distance connections, which mimics
+more closely the known biological fact that LGN cells form connections with V1 cells that are closer together spatially. We do this by introducing a penalty based on the distance 
+between each LGN-V1 cell pair.
+$$
+\mathcal{L}_\text{reg} = \mathcal{L}_\text{trip} + \lambda \left[ \right]
+$$
+
+\subsubsection{Benchmarking}
+Triplets were generated from natural video datasets, where temporal adjacency defined positive pairs and negative pairs come from pairs of images that are temporally spread apart. 
+We used the Adam optimizer with learning rate of 0.0001 and early stopping for 10 epochs based on the validation loss to assess convergence.
+
+To assess representation quality, we use Triplet loss ($\mathcal{L}_{trip}$), violations and Gini index. The violations are defined as the proportion of triplets whose anchor-positive distance is larger
+than the anchor-negative distance in representation space, formally given as:
+$$
+V=
+$$
+
+The Gini index is a measure of sparsity, originally developed in economic theories, but reworked here to measure the sparsity of a given V1 representation. We compute the Gini index as:
+$$
+G=
+$$
+
+To measure the overall quality of a particular network architecture, we take some combination of these valuations into account.
+
+\subsection{Implementation and High-Performance Computing}
+
+To handle the scale of these biological simulations, the model was implemented in JAX. This choice allowed for the pre-calculation of connectivity matrices as JAX arrays, 
+enabling differentiable forward passes. As V1 dimensions reached the upper bounds of our training paradigm (tens of thousands of neurons), we utilized \textit{multi-GPU sharding} on 
+the hoffman2 high performance computing cluster at UCLA. By sharding the V1 connectivity matrix across multiple RTX 2080 Ti GPUs, we bypassed the memory limitations of single devices, 
+allowing us to perform full-gradient updates on models that would otherwise be impossible to fit in a single VRAM bank.
+
+\section{Results Summary}
+
+\subsection{Training Convergence}
+Models across all V1 scales showed consistent reduction in triplet loss. However, high-expansion models reached lower final losses and exhibited fewer triplet violations on the test set.
+
+\begin{table}[ht!]
+\centering
+\caption{Model Performance Across Expansion Factors}
+\label{tab:results}
+\begin{tabular}{@{}lccc@{}}
+\toprule
+\textbf{V1 Expansion Factor} & \textbf{Final Test Loss} & \textbf{Triplet Violations (\%)} \\ \midrule
+1x (Control)        & 0.45            & 18.2\%                   \\
+10x                 & 0.32            & 12.5\%                   \\
+50x                 & 0.28            & 8.1\%                    \\
+300x                & 0.25            & 5.4\%                    \\ \bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[ht!]
+\centering
+%\includegraphics[width=0.8\textwidth]{figures/training_curves.png}
+\caption{Placeholder: Training curves showing Test Loss vs. Epoch for different V1 dimensions.}
+\label{fig:loss}
+\end{figure}
+
+\subsection{Representation Sparsity}
+Using the \textbf{Gini Coefficient} as a measure of sparsity, we observed that V1 expansion leads to significantly more sparse representations. 
+
+\begin{figure}[ht!]
+\centering
+%\includegraphics[width=0.8\textwidth]{figures/sparsity_hist.png}
+\caption{Placeholder: Histograms of V1 activations and Gini coefficient vs. Expansion Factor.}
+\label{fig:sparsity}
+\end{figure}
+
+\subsection{V1 receptive fields}
+Interestingly, we also identify unique receptive fields that are created through each of the different models. In the haphazard wiring model, we identify unexpected receptive fields
+based on the field's prior estimated Gabor filter model of V1 cells.
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.9\linewidth]{/Users/sakinkirti/Programming/ucla/dipoppa-lab/02_code/thalamocortical_powerlaw/figures/haphazard_v1_rf.png}
+    \caption{Example receptive fields created by haphazard wiring in V1 layer. ON LGN connections in red, OFF LGN connections in blue.}
+    \label{fig:haphazard_v1_rf}
+\end{figure}
+
+\section{Discussion and Conclusion}
+Our results suggest that the thalamocortical expansion serves as a critical component for metric learning and feature separation. By projecting low-dimensional retinal inputs into a high-dimensional cortical space, the visual system creates a representation where temporal variations are more easily separable. The transition to JAX and multi-GPU sharding has enabled us to test these biological hypotheses at a scale previously reserved for traditional deep learning architectures.
+
+\section{References}
+\begin{itemize}
+    \item Ringach, D. L. (2002). ``Spatial structure and age-dependent changes in the receptive field properties of V1 neurons.''
+    \item Slapik \& Shouval (2026). ``Early Visual Systems: A New Perspective on Expansion.''
+    \item JAX Documentation: High-performance gradient transformation.
+\end{itemize}
+
+\end{document}

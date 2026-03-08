@@ -8,3 +8,8 @@ MNIST/
 .ipynb_checkpoints
 __pycache__/
 joblog/
+
+# tex files
+final_report*
+!final_report.pdf
+!final_report.tex
