@@ -1,0 +1,13 @@
+name: tce_v2
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - h5py
+  - pytorch
+  - tqdm
+  - pandas
+  - optax
+  - ipykernel
+  - matplotlib
+prefix: /u/home/s/skirti/miniforge3/envs/tce_v2

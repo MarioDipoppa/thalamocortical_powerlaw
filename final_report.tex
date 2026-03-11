@@ -2,7 +2,7 @@
 
 % --- Preamble ---
 \usepackage[utf8]{inputenc}
-\usepackage[margin=1in]{geometry}
+\usepackage[margin=0.5in]{geometry}
 \usepackage{graphicx}
 \usepackage{amsmath}
 \usepackage{amssymb}
@@ -21,7 +21,7 @@
 }
 
 \title{Thalamocortical Expansion and Representation Learning in the Visual System}
-\author{Sakin Kirti \\ \small Dippopa Lab Rotation Project \\ \small Winter 2026 \\ \small Dept. of Neurobiology, UCLA}
+\author{Sakin Kirti \\ \small Dippopa Lab Rotation Project \\ \small Winter 2026 \\ \small Department of Neurobiology, UCLA}
 \date{\today}
 
 \begin{document}
@@ -39,25 +39,18 @@ thalamocortical expansion serves as a high-dimensional mapping stage necessary f
 \end{abstract}
 
 \section{Introduction}
-The architectural layout of the early visual pathway provides a compelling example of biological specialized wiring. The process begins in the retina, where light 
-is transduced into electrical signals by photoreceptors and subsequently processed by a mosaic of Retinal Ganglion Cells (RGCs). These cells form the bottleneck of 
-the visual system, projecting through the optic nerve to the Lateral Geniculate Nucleus (LGN) of the thalamus. Biologically, the ratio of RGCs to LGN neurons is nearly 1:1, 
-or characterized by a modest expansion. However, the subsequent projection from the LGN to the Primary Visual Cortex (V1) undergoes a radical transformation. 
-In mammals, this thalamocortical pathway exhibits an expansion characterized by a power law of roughly $K=N^{3/2}$, where $K$ is the number of V1 neurons and $N$ is the 
-number of LGN neurons. Clearly, a relatively small number of thalamic inputs are mapped onto a vast population of cortical neurons, reaching a 1:300 ratio in humans.
+The architectural layout of the early visual pathway provides a compelling example of specialized biological wiring, characterized by a dramatic transformation of signal 
+density as information traverses from the retina to the cortex. Visual signaling begins with a mosaic of Retinal Ganglion Cells (RGCs) that form a functional bottleneck, 
+projecting through the optic nerve to the Lateral Geniculate Nucleus (LGN) with a nearly 1:1 ratio. However, the subsequent projection from the LGN to the Primary Visual 
+Cortex (V1) undergoes a radical expansion, governed by a power law relationship roughly expressed as $K=N^{3/2}$, where $K$ and $N$ represent the number of V1 and LGN 
+neurons respectively. In human systems, this mapping reaches an extreme 1:300 ratio, concentrating a relatively small number of thalamic inputs onto a vast cortical population.
 
-The functional necessity of this massive over-representation is a central theme in computational neuroscience. One prominent hypothesis is that this expansion 
-allows the cortex to implement an overcomplete basis set for signal representation. Unlike a critically sampled system, an overcomplete system provides the flexibility 
-to represent inputs with higher sparsity, a strategy computationally known to make downstream classification tasks significantly easier. By projecting the low-dimensional 
-outputs of the LGN into a much higher-dimensional space in V1, the brain may be performing a non-linear mapping that simplifies the separation of overlapping stimulus features, 
-effectively behaving like a kernel expansion in machine learning. This expansion is thought to be the foundation for the emergence of complex receptive field properties, 
-such as orientation selectivity and direction sensitivity, which are absent in the circularly symmetric filters of the retina and LGN.
-
-Furthermore, the geometry of this expansion is not random but follows precise topographic and probabilistic wiring rules. Neurons in V1 do not receive inputs from the 
-entire LGN pool; instead, they integrate information from localized ``neighborhoods,'' maintaining a retinotopic map while diversifying the feature space. Understanding 
-how this structural expansion relates to the quality of representation learning is the primary motivation for this project. We aim to quantify whether higher expansion 
-factors directly lead to better category or temporal separation in a representation learning context, using naturalistic video stimuli that mimic the continuous stream of 
-visual information encountered in biological environments.
+The functional necessity of this massive over-representation is a central theme in computational neuroscience, primarily hypothesized to enable the cortex to implement 
+an overcomplete basis set for signal representation. By projecting low-dimensional LGN outputs into a much higher-dimensional space in V1, the brain may perform a 
+non-linear mapping that facilitates efficient coding and simplifies the separation of overlapping stimulus features, similar to a kernel expansion in machine learning. 
+This structural expansion follows precise topographic and probabilistic wiring rules, where V1 neurons integrate information from localized neighborhoods to diversify 
+the feature space while maintaining a retinotopic map. This project aims to quantify the benefits of this expansion by assessing how varying expansion factors directly 
+influence the quality of representation learning and temporal separation when processing naturalistic video stimuli.
 
 \section{Methodology}
 
@@ -122,13 +115,6 @@ $$
 $$
 where $a$, $p$, and $n$ denote the anchor, positive, and negative images and $d$ is the distance between two images in representation space. $\alpha$ is a pre-defined margin that allows
 the model to make small amounts of errors.
-
-To train distance-regularized models, we continue to use triplet loss, but add an additional regularization term that encourages the model to make short distance connections, which mimics
-more closely the known biological fact that LGN cells form connections with V1 cells that are closer together spatially. We do this by introducing a penalty based on the distance 
-between each LGN-V1 cell pair.
-$$
-\mathcal{L}_\text{reg} = \mathcal{L}_\text{trip} + \lambda \left[ \right]
-$$
 
 \subsubsection{Benchmarking}
 Triplets were generated from natural video datasets, where temporal adjacency defined positive pairs and negative pairs come from pairs of images that are temporally spread apart. 

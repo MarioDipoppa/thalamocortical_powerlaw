@@ -29,19 +29,24 @@ def main(args:argparse.ArgumentParser):
     # set up the storage on disk
     triplets = np.lib.format.open_memmap(args.out, mode="w+", dtype=np.float32, shape=(int(args.n_triplets), 3, int(args.crop_size), int(args.crop_size)))
     
+    n_per_frame = int(args.n_triplets) // props.n_images
+
     for i,f in tqdm(enumerate(video)):
-        
-        # generate the triplets
+
         a = f[Y, X].squeeze()
+
         if i + int(args.an_dist) > props.n_images - 1:
             p = video[i-int(args.ap_dist)][Y, X].squeeze()
             n = video[i-int(args.an_dist)][Y, X].squeeze()
         else:
             p = video[i+int(args.ap_dist)][Y, X].squeeze()
             n = video[i+int(args.an_dist)][Y, X].squeeze()
-            
-        # store the triplets
-        triplet_set = np.stack([a, p, n], axis=1)
+
+        triplet_set = np.stack([a,p,n],axis=1)
+
+        start = i * n_per_frame
+        end = start + n_per_frame
+        triplets[start:end] = triplet_set
         for j,k in zip(range(i * (int(args.n_triplets) // props.n_images)), range(int(args.n_triplets) // props.n_images)):
             triplets[i * (int(args.n_triplets) // props.n_images) + j] = triplet_set[k]
 
