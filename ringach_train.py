@@ -198,6 +198,7 @@ def main():
     parser.add_argument("--margin", type=float, default=0.2)
     parser.add_argument("--l1_lambda", type=float, default=0.0)
     parser.add_argument("--patience", type=int, default=10)
+    parser.add_argument("--init-style", type=str, default="random uniform")
     args = parser.parse_args()
 
     os.makedirs(args.out, exist_ok=True)
@@ -218,7 +219,11 @@ def main():
     model = ringach_VVS(shape=shape, n_RGC=n_rgc_side, v1_dim=v1_side, eta_0=[3,8])
     
     # Use dense weights as parameters
-    params = model.LGN_V1_conn
+    if args.init_style == "biological prior":
+        params = model.LGN_V1_conn
+    elif args.init_style == "random uniform":
+        model.LGN_V1_conn = jax.random.uniform(key=1234, shape=model.LGN_V1_conn.shape, dtype=float32)
+        params = model.LGN_V1_conn
     
     # 3. Setup Sharding Mesh
     devices = jax.devices()

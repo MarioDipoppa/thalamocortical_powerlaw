@@ -28,7 +28,7 @@ def main():
     os.makedirs(args.out, exist_ok=True)
     
     # Configuration
-    shape = (224, 224)
+    shape = (64, 64) # (224, 224)
     n_rgc_side = int(np.sqrt(args.lgn // 2.5))
     v1_side = int(np.sqrt(args.v1))
     print(f"Initializing model with LGN={args.lgn} (RGC_grid={n_rgc_side}) and V1_grid={v1_side}...")
@@ -91,7 +91,7 @@ def main():
         # Move batch to GPU explicitly
         B = batch.shape[0]
         batch_dev = jax.device_put(batch)
-        flattened_batch = batch_dev.reshape(-1, 224, 224)
+        flattened_batch = batch_dev.reshape(-1, 64, 64)
         
         r_batch, l_batch, v_batch = jit_forward(flattened_batch, params)
         

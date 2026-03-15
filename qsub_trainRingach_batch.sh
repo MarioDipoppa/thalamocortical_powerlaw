@@ -2,7 +2,7 @@
 #$ -N train-Ringach
 #$ -cwd
 #$ -V
-#$ -l gpu,RTX2080Ti,cuda=2,h_rt=12:00:00,h_vmem=32G
+#$ -l gpu,RTX2080Ti,cuda=2,h_rt=04:00:00,h_vmem=32G
 #$ -j y
 #$ -o joblog/unconstrained_margin3.$JOB_ID.$TASK_ID
 #$ -M sakinkirti@g.ucla.edu
@@ -10,6 +10,7 @@
 
 ### Parallel Job Array
 #$ -t 1-60
+#$ -tc 4
 
 # RTX2080Ti is older gpu arch, so disable new NCCL stuff
 export NCCL_P2P_DISABLE=1
@@ -33,11 +34,12 @@ export MKL_NUM_THREADS=1
 PYTHON_EXE="/u/home/s/skirti/miniforge3/envs/tce_v2/bin/python"
 DATA_PATH="/u/home/s/skirti/scratch/dipoppa-lab/thalamocortical-expansion/01_data/natural_movies/IMG_3625_train_patches.npy"
 DATA_KEY="allPatches"
-OUT_DIR="train_results_ringach_unconstrained_margin3"
+OUT_DIR="train_unconstrained_margin3_randominit"
 BATCH_SIZE=48
 EPOCHS=200
 LR=0.0001
-MARGIN=0.
+MARGIN=3.
+INIT_STYLE="random uniform"
 
 mkdir -p $OUT_DIR
 mkdir -p joblog
@@ -79,6 +81,7 @@ $PYTHON_EXE ringach_train.py \
     --batch_size $BATCH_SIZE \
     --lr $LR \
     --margin $MARGIN \
+    --init-style $INIT_STYLE \
     --out $OUT_DIR
 
 echo "Task $SGE_TASK_ID training completed."

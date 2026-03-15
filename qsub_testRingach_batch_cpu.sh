@@ -1,8 +1,7 @@
 #!/bin/bash
 #$ -N un-m0-cpu
 #$ -cwd
-#$ -V
-#$ -l h_rt=04:00:00,h_vmem=16G
+#$ -l h_rt=04:00:00,h_vmem=64G
 #$ -j y
 #$ -o joblog/un-m0-cpu.$JOB_ID.$TASK_ID
 #$ -M sakinkirti@g.ucla.edu
@@ -13,7 +12,7 @@
 
 # optimize JAX
 export XLA_PYTHON_CLIENT_PREALLOCATE=false
-export JAX_PLATFORM_NAME=cpu
+export JAX_PLATFORMS=cpu
 export OMP_NUM_THREADS=4
 export MKL_NUM_THREADS=4
 
@@ -22,12 +21,12 @@ module load gcc/11.3.0
 
 # changes based on which model/margin value to test
 PYTHON_EXE="/u/home/s/skirti/miniforge3/envs/tce_v2/bin/python"
-INPUT_DATA="/u/home/s/skirti/scratch/dipoppa-lab/thalamocortical-expansion/01_data/natural_movies/IMG_3625_test_patches.npy"
+INPUT_DATA="/u/home/s/skirti/scratch/dipoppa-lab/thalamocortical-expansion/01_data/natural_movies/IMG_3625_patches_64.npy"
 PARAMS_DIR="/u/home/s/skirti/scratch/dipoppa-lab/thalamocortical-expansion/02_code/thalamocortical_powerlaw/train_unconstrained_margin0"
-OUT_DIR="results_unconstrained_margin0"
+OUT_DIR="results_probabilistic_margin0_patch64"
 BATCH_SIZE=48
 MARGIN=0.
-TEST_TRAINED=true  # Set to false to test untrained models even if params exist
+TEST_TRAINED=false # Set to false to test untrained models even if params exist
 
 # Define the grid of parameters
 LGN_VALUES=(32 64 128 256 512 1024)
@@ -60,8 +59,20 @@ else
     PARAM_ARG=""
 fi
 
+# some logging so i can debug just in case
 echo "Task $SGE_TASK_ID: Testing LGN=$lgn, V1=$v1"
+echo "Python:"
+which python
 
+echo "CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES"
+echo "JAX_PLATFORMS=$JAX_PLATFORMS"
+
+$PYTHON_EXE - <<EOF
+import jax
+print("Devices:", jax.devices())
+EOF
+
+# run the actual code
 $PYTHON_EXE ringach_test.py \
     --lgn $lgn \
     --v1 $v1 \
